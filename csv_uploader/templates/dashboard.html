@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>BINUS Senayan Student Attendance Analysis Tool - Attendlytics</title>
+    <!-- Include Bootstrap CSS for styling -->
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    />
+    <!-- Include DataTables CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap4.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/buttons/2.2.3/css/buttons.dataTables.min.css"
+    />
+    <!-- Include Select2 CSS -->
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css"
+      rel="stylesheet"
+    />
+    <!-- Include jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Include DataTables JS -->
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap4.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.2.3/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.2.3/js/buttons.html5.min.js"></script>
+    <!-- Include Chart JS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+    <!-- Include Select2 JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="../static/css/styles.css" />
+  </head>
+  <body>
+    <div class="container-fluid mt-5">
+      <div class="row justify-content-center">
+        <div class="col-12">
+          <div class="card shadow-sm" id="main-card">
+            <div class="card-body">
+              <a href="/" class="btn btn-secondary mb-3">Back</a>
+              <h1 class="card-title mb-4">
+                BINUS Senayan - Students' Attendance Data - Dashboard
+              </h1>
+              <h4 class="mt-3 mb-3">Pie chart for 1 major, 1 semester</h4>
+              <form id="retrieveForm">
+                <div class="form-row d-flex ml-0">
+                  <div class="form-group mr-4">
+                    <label for="semesterType">Semester Type:</label>
+                    <select
+                      id="semesterType"
+                      class="form-control"
+                      style="width: 12vw"
+                    >
+                      <option value="Odd">Odd</option>
+                      <option value="Even">Even</option>
+                      <option value="Compact">Compact</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="yearInput">Year:</label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="yearInput"
+                      placeholder="Enter year.."
+                      style="width: 12vw"
+                    />
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="valueMajorInput">Value:</label>
+                    <select
+                      id="valueMajorInput"
+                      class="form-control"
+                      style="width: 25vw"
+                    >
+                      <option value="Number" selected>
+                        Number of students under threshold
+                      </option>
+                      <option value="Percentage">
+                        Percentage of students under threshold
+                      </option>
+                    </select>
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="thresholdPieInput"
+                      >Minimum attendance (%):</label
+                    >
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="thresholdPieInput"
+                      min="0"
+                      max="100"
+                      placeholder="Enter attendance threshold.."
+                      style="width: 15vw"
+                    />
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="divisorPieInput"
+                      >Attendance calculated based on:</label
+                    >
+                    <select
+                      id="divisorPieInput"
+                      class="form-control"
+                      style="width: 30vw"
+                    >
+                      <option value="Present" selected>
+                        Current number of sessions
+                      </option>
+                      <option value="Projected">
+                        All semester sessions with projected attendance
+                      </option>
+                    </select>
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="majorInput">Major:</label>
+                    <select
+                      id="majorInput"
+                      class="form-control"
+                      style="width: 25vw"
+                    >
+                      <option value="Business Information Systems">
+                        Business Information Systems
+                      </option>
+                      <option value="Business Management & Marketing">
+                        Business Management & Marketing
+                      </option>
+                      <option value="Communications">Communications</option>
+                      <option value="Computer Science">Computer Science</option>
+                      <option value="Digital Business">Digital Business</option>
+                      <option value="Fashion">Fashion</option>
+                      <option value="Finance">Finance</option>
+                      <option value="Graphic Design and New Media">
+                        Graphic Design and New Media
+                      </option>
+                      <option value="International Business">
+                        International Business
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  class="btn btn-primary mt-2 mb-4"
+                  onclick="loadPieChart()"
+                >
+                  Create pie chart
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-danger mt-2 mb-4 ml-4 none"
+                  chartId="attendancePieChart"
+                  id="pieChartHideButton"
+                  onclick="clearChart(event)"
+                >
+                  Clear pie chart
+                </button>
+              </form>
+              <div
+                class="chart mt-3 mb-5"
+                style="justify-content: center; width: 100%"
+                id="pieChartContainer"
+              >
+                <div
+                  style="
+                    width: 50vw;
+                    height: 40vh;
+                    display: flex;
+                    justify-content: center;
+                  "
+                >
+                  <canvas id="attendancePieChart"></canvas>
+                </div>
+              </div>
+
+              <h4 class="mt-3 mb-3">Bar chart to compare majors</h4>
+              <form id="retrieveForm">
+                <div class="form-row d-flex ml-0">
+                  <div class="form-group mr-4">
+                    <label for="semesterTypeMajor">Semester Type:</label>
+                    <select
+                      id="semesterTypeMajor"
+                      class="form-control"
+                      style="width: 12vw"
+                    >
+                      <option value="Odd">Odd</option>
+                      <option value="Even">Even</option>
+                      <option value="Compact">Compact</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="yearInputMajor">Year:</label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="yearInputMajor"
+                      placeholder="Enter year.."
+                      style="width: 12vw"
+                    />
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="valueInput">Value:</label>
+                    <select
+                      id="valueInput"
+                      class="form-control"
+                      style="width: 25vw"
+                    >
+                      <option value="Number" selected>
+                        Number of students under threshold
+                      </option>
+                      <option value="Percentage">
+                        Percentage of students under threshold
+                      </option>
+                    </select>
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="thresholdMajorInput"
+                      >Minimum attendance (%):</label
+                    >
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="thresholdMajorInput"
+                      min="0"
+                      max="100"
+                      placeholder="Enter attendance threshold.."
+                      style="width: 15vw"
+                    />
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="divisorMajorInput"
+                      >Attendance calculated based on:</label
+                    >
+                    <select
+                      id="divisorMajorInput"
+                      class="form-control"
+                      style="width: 30vw"
+                    >
+                      <option value="Present" selected>
+                        Current number of sessions
+                      </option>
+                      <option value="Projected">
+                        All semester sessions with projected attendance
+                      </option>
+                    </select>
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="majorInputMultiple">Majors:</label>
+                    <select
+                      id="majorInputMultiple"
+                      class="form-control"
+                      multiple="multiple"
+                      style="display: flex; width: 50vw"
+                    >
+                      <option value="Business Information Systems">
+                        Business Information Systems
+                      </option>
+                      <option value="Business Management & Marketing">
+                        Business Management & Marketing
+                      </option>
+                      <option value="Communications">Communications</option>
+                      <option value="Computer Science">Computer Science</option>
+                      <option value="Digital Business">Digital Business</option>
+                      <option value="Fashion">Fashion</option>
+                      <option value="Finance">Finance</option>
+                      <option value="Graphic Design and New Media">
+                        Graphic Design and New Media
+                      </option>
+                      <option value="International Business">
+                        International Business
+                      </option>
+                    </select>
+                    <button
+                      type="button"
+                      class="btn btn-secondary ml-3"
+                      style="width: 15vw"
+                      id="selectAllMajors"
+                    >
+                      Select/Deselect All
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  class="btn btn-primary mt-2 mb-4"
+                  onclick="loadBarChartMajorComparison()"
+                >
+                  Create bar chart - major
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-danger mt-2 mb-4 ml-4 none"
+                  chartId="barChartMajor"
+                  id="barChartMajorHideButton"
+                  onclick="clearChart(event)"
+                >
+                  Clear bar chart - major
+                </button>
+              </form>
+
+              <div
+                class="chart mt-3"
+                style="justify-content: center; width: 100%"
+                id="barChartMajorContainer"
+              >
+                <div
+                  style="
+                    width: 90vw;
+                    height: 70vh;
+                    display: flex;
+                    justify-content: center;
+                  "
+                >
+                  <canvas id="barChartMajor"></canvas>
+                </div>
+              </div>
+
+              <h4 class="mt-3 mb-3">Bar chart to monitor one student</h4>
+              <form id="retrieveForm">
+                <div class="form-row d-flex ml-0">
+                  <div class="form-group mr-4">
+                    <label for="nimInput">NIM:</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="nimInput"
+                      placeholder="Enter NIM.."
+                      style="width: 25vw"
+                    />
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="thresholdStudentInput"
+                      >Minimum attendance (%):</label
+                    >
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="thresholdStudentInput"
+                      min="0"
+                      max="100"
+                      placeholder="Enter attendance threshold.."
+                      style="width: 15vw"
+                    />
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="divisorStudentInput"
+                      >Attendance calculated based on:</label
+                    >
+                    <select
+                      id="divisorStudentInput"
+                      class="form-control"
+                      style="width: 30vw"
+                    >
+                      <option value="Present" selected>
+                        Current number of sessions
+                      </option>
+                      <option value="Projected">
+                        All semester sessions with projected attendance
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  class="btn btn-primary mt-2 mb-4"
+                  onclick="loadBarChartStudent()"
+                >
+                  Create bar chart - student
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-danger mt-2 mb-4 ml-4 none"
+                  chartId="barChartStudent"
+                  id="barChartStudentHideButton"
+                  onclick="clearChart(event)"
+                >
+                  Clear bar chart - student
+                </button>
+              </form>
+
+              <div
+                class="chart mt-3"
+                style="justify-content: center; width: 100%"
+                id="barChartStudentContainer"
+              >
+                <div
+                  style="
+                    width: 90vw;
+                    height: 70vh;
+                    display: flex;
+                    justify-content: center;
+                  "
+                >
+                  <canvas id="barChartStudent"></canvas>
+                </div>
+              </div>
+
+              <h4 class="mt-3 mb-3">Bar chart to monitor one course</h4>
+              <form id="retrieveForm">
+                <div class="form-row d-flex ml-0">
+                  <div class="form-group mr-4">
+                    <label for="courseInput">Course Code:</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="courseInput"
+                      placeholder="Enter Course Code.."
+                      style="width: 20vw"
+                    />
+                  </div>
+
+                  <div class="ml-2 mr-4">
+                    <label for="courseComponentInput">Course Component:</label>
+                    <select
+                      id="courseComponentInput"
+                      class="form-control"
+                      style="width: 12vw"
+                    >
+                      <option value="LEC">LEC</option>
+                      <option value="LAB">LAB</option>
+                      <option value="EXL">EXL</option>
+                      <option value="BLK">BLK</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="valueCourseInput">Value:</label>
+                    <select
+                      id="valueCourseInput"
+                      class="form-control"
+                      style="width: 25vw"
+                    >
+                      <option value="Number" selected>
+                        Number of students under threshold
+                      </option>
+                      <option value="Percentage">
+                        Percentage of students under threshold
+                      </option>
+                    </select>
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="thresholdCourseInput"
+                      >Minimum attendance (%):</label
+                    >
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="thresholdCourseInput"
+                      min="0"
+                      max="100"
+                      placeholder="Enter attendance threshold.."
+                      style="width: 15vw"
+                    />
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="divisorCourseInput"
+                      >Attendance calculated based on:</label
+                    >
+                    <select
+                      id="divisorCourseInput"
+                      class="form-control"
+                      style="width: 30vw"
+                    >
+                      <option value="Present" selected>
+                        Current number of sessions
+                      </option>
+                      <option value="Projected">
+                        All semester sessions with projected attendance
+                      </option>
+                    </select>
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="semesterAmountInput"
+                      >Number of semesters to compare:</label
+                    >
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="semesterAmountInput"
+                      placeholder="No. of semesters.."
+                      style="width: 15vw"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  class="btn btn-primary mt-2 mb-4"
+                  onclick="loadBarChartCourse()"
+                >
+                  Create bar chart - course
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-danger mt-2 mb-4 ml-4 none"
+                  chartId="barChartCourse"
+                  id="barChartCourseHideButton"
+                  onclick="clearChart(event)"
+                >
+                  Clear bar chart - course
+                </button>
+              </form>
+
+              <div
+                class="chart mt-3"
+                style="justify-content: center; width: 100%"
+                id="barChartCourseContainer"
+              >
+                <div
+                  style="
+                    width: 90vw;
+                    height: 70vh;
+                    display: flex;
+                    justify-content: center;
+                  "
+                >
+                  <canvas id="barChartCourse"></canvas>
+                </div>
+              </div>
+
+              <h4 class="mt-3 mb-3">Bar chart for 1 student, 1 course</h4>
+              <form id="retrieveForm">
+                <div class="form-row d-flex ml-0">
+                  <div class="form-group mr-4">
+                    <label for="nimStudentCourseInput">NIM:</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="nimStudentCourseInput"
+                      placeholder="Enter NIM.."
+                      style="width: 20vw"
+                    />
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="courseStudentCourseInput">Course Code:</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="courseStudentCourseInput"
+                      placeholder="Enter Course Code.."
+                      style="width: 20vw"
+                    />
+                  </div>
+
+                  <div class="ml-2 mr-4">
+                    <label for="studentCourseComponentInput"
+                      >Course Component:</label
+                    >
+                    <select
+                      id="studentCourseComponentInput"
+                      class="form-control"
+                      style="width: 12vw"
+                    >
+                      <option value="LEC">LEC</option>
+                      <option value="LAB">LAB</option>
+                      <option value="EXL">EXL</option>
+                      <option value="BLK">BLK</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group mr-4">
+                    <label for="valueStudentCourseInput">Value:</label>
+                    <select
+                      id="valueStudentCourseInput"
+                      class="form-control"
+                      style="width: 30vw"
+                    >
+                      <option value="Number" selected>
+                        Number of PRESENT sessions
+                      </option>
+                      <option value="Percentage">
+                        Percentage of PRESENT sessions
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  class="btn btn-primary mt-2 mb-4"
+                  onclick="loadBarChartStudentCourse()"
+                >
+                  Create bar chart - student & course
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-danger mt-2 mb-4 ml-4 none"
+                  chartId="barChartStudentCourse"
+                  id="barChartStudentCourseHideButton"
+                  onclick="clearChart(event)"
+                >
+                  Clear bar chart - course
+                </button>
+              </form>
+
+              <div
+                class="chart mt-3"
+                style="justify-content: center; width: 100%"
+                id="barChartStudentCourseContainer"
+              >
+                <div
+                  style="
+                    width: 90vw;
+                    height: 70vh;
+                    display: flex;
+                    justify-content: center;
+                  "
+                >
+                  <canvas id="barChartStudentCourse"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      var attendancePieChart = null;
+      var barChartMajor = null;
+      var barChartStudent = null;
+      var barChartCourse = null;
+      var barChartStudentCourse = null;
+
+      $(document).ready(function () {
+        $('#majorInputMultiple').select2();
+        $('#thresholdPieInput').val(50);
+        $('#thresholdMajorInput').val(50);
+        $('#thresholdStudentInput').val(50);
+        $('#thresholdCourseInput').val(50);
+      });
+
+      $('#selectAllMajors').click(function () {
+        let allOptions = $('#majorInputMultiple option')
+          .map(function () {
+            return this.value;
+          })
+          .get();
+        let selectedValues = $('#majorInputMultiple').val();
+
+        // If all are selected, deselect all, else select all
+        if (selectedValues.length === allOptions.length) {
+          $('#majorInputMultiple').val([]).trigger('change');
+        } else {
+          $('#majorInputMultiple').val(allOptions).trigger('change');
+        }
+      });
+
+      function clearChart(event) {
+        let chartId = event.target.getAttribute('chartId');
+
+        if (chartId === 'attendancePieChart') {
+          attendancePieChart.destroy();
+          $('#pieChartContainer').removeClass('flex');
+          $('#pieChartHideButton').addClass('none');
+        } else if (chartId === 'barChartMajor') {
+          barChartMajor.destroy();
+          $('#barChartMajorContainer').removeClass('flex');
+          $('#barChartMajorHideButton').addClass('none');
+        } else if (chartId === 'barChartStudent') {
+          barChartStudent.destroy();
+          $('#barChartStudentContainer').removeClass('flex');
+          $('#barChartStudentHideButton').addClass('none');
+        } else if (chartId === 'barChartCourse') {
+          barChartCourse.destroy();
+          $('#barChartCourseContainer').removeClass('flex');
+          $('#barChartCourseHideButton').addClass('none');
+        } else if (chartId === 'barChartStudentCourse') {
+          barChartStudentCourse.destroy();
+          $('#barChartStudentCourseContainer').removeClass('flex');
+          $('#barChartStudentCourseHideButton').addClass('none');
+        } else {
+          alert("Error clearing chart: Chart doesn't exist.");
+        }
+      }
+
+      function loadPieChart() {
+        var semesterType = $('#semesterType').val();
+        var year = $('#yearInput').val();
+        var value = $('#valueMajorInput').val();
+        var major = $('#majorInput').val();
+        var threshold = $('#thresholdPieInput').val();
+        var divisor = $('#divisorPieInput').val();
+
+        if (!year) {
+          alert('Please enter a year.');
+          return;
+        }
+
+        if (!Number.isInteger(Number(year))) {
+          alert('Year must be an integer');
+          return;
+        }
+
+        if (parseInt(year) < 0) {
+          alert("Year can't be negative");
+          return;
+        }
+
+        if ((Number(threshold) < 0) | (Number(threshold) > 100)) {
+          alert('Attendance threshold must be between 0% and 100%');
+          return;
+        }
+
+        // Destroy chart if one already exists
+        if (attendancePieChart !== null) {
+          attendancePieChart.destroy();
+        }
+
+        $.ajax({
+          type: 'POST',
+          url: '/get_pie_chart_data',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            semester_type: semesterType,
+            year: parseInt(year),
+            value: value,
+            major: major,
+            threshold: parseFloat(threshold),
+            divisor: divisor,
+          }),
+          success: function (data) {
+            if (data.error) {
+              alert(data.error);
+              return;
+            }
+
+            $('#pieChartContainer').addClass('flex');
+            $('#pieChartHideButton').removeClass('none');
+
+            let ctx = document
+              .getElementById('attendancePieChart')
+              .getContext('2d');
+            attendancePieChart = new Chart(ctx, {
+              type: 'pie',
+              data: {
+                labels: [
+                  `≥${threshold}% Attendance`,
+                  `<${threshold}% Attendance`,
+                ],
+                datasets: [
+                  {
+                    data: [data.above_50, data.below_50],
+                    backgroundColor: ['#4CAF50', '#FF2727'],
+                    borderWidth: 0, // Removing default white border so it looks fine if the whole chart is one label
+                  },
+                ],
+              },
+              // Displaying labels for values
+              options: {
+                plugins: {
+                  datalabels: {
+                    color: 'black',
+                    font: {
+                      weight: 'bold',
+                      size: 20,
+                    },
+                    formatter: (value) => value,
+                  },
+                },
+              },
+              plugins: [ChartDataLabels],
+            });
+          },
+          error: function () {
+            alert('Error retrieving chart data.');
+          },
+        });
+      }
+
+      function loadBarChartMajorComparison() {
+        var semesterType = $('#semesterTypeMajor').val();
+        var year = $('#yearInputMajor').val();
+        var value = $('#valueInput').val();
+        var majors = $('#majorInputMultiple').val();
+        var threshold = $('#thresholdMajorInput').val();
+        var divisor = $('#divisorMajorInput').val();
+
+        if (!year) {
+          alert('Please enter a year.');
+          return;
+        }
+
+        if (!Number.isInteger(Number(year))) {
+          alert('Year must be an integer');
+          return;
+        }
+
+        if (parseInt(year) < 0) {
+          alert("Year can't be negative");
+          return;
+        }
+
+        if (majors.length === 0) {
+          alert('Please select at least one major');
+          return;
+        }
+
+        if ((Number(threshold) < 0) | (Number(threshold) > 100)) {
+          alert('Attendance threshold must be between 0% and 100%');
+          return;
+        }
+
+        // Destroy chart if one already exists
+        if (barChartMajor !== null) {
+          barChartMajor.destroy();
+        }
+
+        $.ajax({
+          type: 'POST',
+          url: '/get_bar_chart_major_data',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            semester_type: semesterType,
+            year: parseInt(year),
+            value: value,
+            majors: majors,
+            threshold: parseFloat(threshold),
+            divisor: divisor,
+          }),
+          success: function (data) {
+            if (data.error) {
+              alert(data.error);
+              return;
+            }
+
+            $('#barChartMajorContainer').addClass('flex');
+            $('#barChartMajorHideButton').removeClass('none');
+
+            let ctx = document.getElementById('barChartMajor').getContext('2d');
+            barChartMajor = new Chart(ctx, {
+              type: 'bar',
+              data: {
+                labels: Object.keys(data),
+                datasets: [
+                  {
+                    label: `${value} of students with <${threshold}% attendance`,
+                    data: Object.values(data),
+                    // backgroundColor: ['#4CAF50', '#FF2727'],
+                    borderWidth: 0, // Removing default white border so it looks fine if the whole chart is one label
+                  },
+                ],
+              },
+
+              // Displaying labels for values
+              options: {
+                plugins: {
+                  datalabels: {
+                    anchor: 'end',
+                    align: 'top',
+                    color: 'black',
+                    font: {
+                      weight: 'bold',
+                      size: 14,
+                    },
+                    formatter: (value) => value,
+                  },
+                },
+              },
+              plugins: [ChartDataLabels],
+            });
+          },
+          error: function () {
+            alert('Error retrieving chart data.');
+          },
+        });
+      }
+
+      function loadBarChartStudent() {
+        var nim = $('#nimInput').val();
+        var threshold = $('#thresholdStudentInput').val();
+        var divisor = $('#divisorStudentInput').val();
+
+        if (!nim) {
+          alert('Please enter NIM.');
+          return;
+        }
+
+        if (!Number.isInteger(Number(nim))) {
+          alert('Invalid NIM format');
+          return;
+        }
+
+        if ((Number(threshold) < 0) | (Number(threshold) > 100)) {
+          alert('Attendance threshold must be between 0% and 100%');
+          return;
+        }
+
+        // Destroy chart if one already exists
+        if (barChartStudent !== null) {
+          barChartStudent.destroy();
+        }
+
+        $.ajax({
+          type: 'POST',
+          url: '/get_bar_chart_student_data',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            nim: nim,
+            threshold: parseFloat(threshold),
+            divisor: divisor,
+          }),
+          success: function (data) {
+            if (data.error) {
+              alert(data.error);
+              return;
+            }
+
+            $('#barChartStudentContainer').addClass('flex');
+            $('#barChartStudentHideButton').removeClass('none');
+
+            // Manually retrieving labels and values to preserve sorting
+            let entries = data.data;
+            let labels = entries.map((entry) => entry.semester);
+            let values = entries.map((entry) => entry.count);
+            let notEnrolled = data.not_enrolled;
+
+            let ctx = document
+              .getElementById('barChartStudent')
+              .getContext('2d');
+            barChartStudent = new Chart(ctx, {
+              type: 'bar',
+              data: {
+                labels: labels,
+                datasets: [
+                  {
+                    label: `${nim} - ${data.name} number of courses <${threshold}% attendance`,
+                    data: values,
+                    borderWidth: 0, // Removing default white border so it looks fine if the whole chart is one label
+                  },
+                ],
+              },
+
+              // Displaying labels for values
+              options: {
+                scales: {
+                  x: {
+                    ticks: {
+                      color: function (value) {
+                        // Get all labels, and change to red if it's in notEnrolled array
+                        return notEnrolled.includes(value.tick.label)
+                          ? 'red'
+                          : 'black';
+                      },
+                    },
+                  },
+                },
+                plugins: {
+                  datalabels: {
+                    align: 'top',
+                    color: 'black',
+                    font: {
+                      weight: 'bold',
+                      size: 14,
+                    },
+                    formatter: (value) => value,
+                  },
+                },
+              },
+              plugins: [ChartDataLabels],
+            });
+          },
+          error: function () {
+            alert('Error retrieving chart data.');
+          },
+        });
+      }
+
+      function loadBarChartCourse() {
+        var course = $('#courseInput').val();
+        var value = $('#valueCourseInput').val();
+        var component = $('#courseComponentInput').val();
+        var semesterCount = $('#semesterAmountInput').val();
+        var threshold = $('#thresholdCourseInput').val();
+        var divisor = $('#divisorCourseInput').val();
+
+        if (!course) {
+          alert('Please enter Course Code.');
+          return;
+        }
+
+        if (!semesterCount) {
+          alert('Please enter the number of semesters');
+          return;
+        }
+
+        if (!Number.isInteger(Number(semesterCount))) {
+          alert('Semester count must be an integer');
+          return;
+        }
+
+        if (parseInt(semesterCount) <= 0) {
+          alert('Semester count must be at least 1');
+          return;
+        }
+
+        if ((Number(threshold) < 0) | (Number(threshold) > 100)) {
+          alert('Attendance threshold must be between 0% and 100%');
+          return;
+        }
+
+        // Destroy chart if one already exists
+        if (barChartCourse !== null) {
+          barChartCourse.destroy();
+        }
+
+        $.ajax({
+          type: 'POST',
+          url: '/get_bar_chart_course_data',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            course: course,
+            component: component,
+            value: value,
+            semester_count: semesterCount,
+            threshold: parseFloat(threshold),
+            divisor: divisor,
+          }),
+          success: function (data) {
+            if (data.error) {
+              alert(data.error);
+              return;
+            }
+
+            $('#barChartCourseContainer').addClass('flex');
+            $('#barChartCourseHideButton').removeClass('none');
+
+            // Manually retrieving labels and values to preserve sorting
+            let entries = data.data;
+            let labels = entries.map((entry) => entry.semester);
+            let values = entries.map((entry) => entry.count);
+
+            let ctx = document
+              .getElementById('barChartCourse')
+              .getContext('2d');
+            barChartCourse = new Chart(ctx, {
+              type: 'bar',
+              data: {
+                labels: labels,
+                datasets: [
+                  {
+                    label: `${course} - ${data.name} - ${component} ${value} of students with <50% attendance`,
+                    data: values,
+                    borderWidth: 0, // Removing default white border so it looks fine if the whole chart is one label
+                  },
+                ],
+              },
+
+              // Displaying labels for values
+              options: {
+                plugins: {
+                  datalabels: {
+                    align: 'top',
+                    color: 'black',
+                    font: {
+                      weight: 'bold',
+                      size: 14,
+                    },
+                    formatter: (value) => value,
+                  },
+                },
+              },
+              plugins: [ChartDataLabels],
+            });
+          },
+          error: function () {
+            alert('Error retrieving chart data.');
+          },
+        });
+      }
+
+      function loadBarChartStudentCourse() {
+        var nim = $('#nimStudentCourseInput').val();
+        var course = $('#courseStudentCourseInput').val();
+        var component = $('#studentCourseComponentInput').val();
+        var value = $('#valueStudentCourseInput').val();
+
+        if (!nim) {
+          alert('Please enter NIM.');
+          return;
+        }
+
+        if (!Number.isInteger(Number(nim))) {
+          alert('Invalid NIM format');
+          return;
+        }
+
+        if (!course) {
+          alert('Please enter Course Code.');
+          return;
+        }
+
+        // Destroy chart if one already exists
+        if (barChartStudentCourse !== null) {
+          barChartStudentCourse.destroy();
+        }
+
+        $.ajax({
+          type: 'POST',
+          url: '/get_bar_chart_student_course_data',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            nim: nim,
+            course: course,
+            component: component,
+            value: value,
+          }),
+          success: function (data) {
+            if (data.error) {
+              alert(data.error);
+              return;
+            }
+
+            $('#barChartStudentCourseContainer').addClass('flex');
+            $('#barChartStudentCourseHideButton').removeClass('none');
+
+            // Manually retrieving labels and values to preserve sorting
+            let entries = data.data;
+            let labels = entries.map((entry) => entry.semester);
+            let values = entries.map((entry) => entry.count);
+
+            let ctx = document
+              .getElementById('barChartStudentCourse')
+              .getContext('2d');
+            barChartStudentCourse = new Chart(ctx, {
+              type: 'bar',
+              data: {
+                labels: labels,
+                datasets: [
+                  {
+                    label: `${nim} - ${data.student_name}, ${course} - ${data.course_name} - ${component} ${value} number of PRESENT sessions`,
+                    data: values,
+                    borderWidth: 0, // Removing default white border so it looks fine if the whole chart is one label
+                  },
+                ],
+              },
+
+              // Displaying labels for values
+              options: {
+                plugins: {
+                  datalabels: {
+                    align: 'top',
+                    color: 'black',
+                    font: {
+                      weight: 'bold',
+                      size: 14,
+                    },
+                    formatter: (value) => value,
+                  },
+                },
+              },
+              plugins: [ChartDataLabels],
+            });
+          },
+          error: function () {
+            alert('Error retrieving chart data.');
+          },
+        });
+      }
+    </script>
+  </body>
+</html>

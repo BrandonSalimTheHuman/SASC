@@ -1,0 +1,78 @@
+body {
+  background-color: #f8f9fa; /* Light grey background */
+}
+
+.card {
+  background-color: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e3e6f0;
+  padding: 20px;
+}
+
+.card-title {
+  color: #4e73df; /* Primary color */
+  font-weight: bold;
+}
+
+.btn-primary {
+  background-color: #4e73df; /* Primary color */
+  border-color: #4e73df;
+}
+
+.btn-primary:hover {
+  background-color: #2e59d9;
+  border-color: #2653d4;
+}
+
+.btn-secondary {
+  background-color: #858796; /* Secondary color */
+  border-color: #858796;
+}
+
+.btn-secondary:hover {
+  background-color: #5a6268;
+  border-color: #545b62;
+}
+
+#dataFrameContainer .table-responsive {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+#dataFrameTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 8px;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+
+th {
+  background-color: #4e73df; /* Primary color */
+  color: white;
+}
+
+tr:nth-child(even) {
+  background-color: #f2f2f2;
+}
+
+.chart {
+  display: none;
+}
+
+.none {
+  display: none;
+}
+
+.chart.flex {
+  display: flex;
+  margin-bottom: 1vh;
+}
+
+.form-group label {
+  display: block;
+}

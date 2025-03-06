@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>BINUS Senayan Student Attendance Analysis Tool - Attendlytics</title>
+    <!-- Include Bootstrap CSS for styling -->
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    />
+    <!-- Include DataTables CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap4.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/buttons/2.2.3/css/buttons.dataTables.min.css"
+    />
+    <!-- Include jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Include DataTables JS -->
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap4.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.2.3/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.2.3/js/buttons.html5.min.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="../static/css/styles.css" />
+  </head>
+  <body>
+    <div class="container-fluid mt-5">
+      <div class="row justify-content-center">
+        <div class="col-12">
+          <div class="card shadow-sm" id="main-card">
+            <div class="card-body">
+              <a href="/dashboard" class="btn btn-secondary mb-3"
+                >Go to Dashboard</a
+              >
+              <h1 class="card-title mb-4">
+                BINUS Senayan - Students' Attendance Data
+              </h1>
+              <h4>Upload Attendance Data</h4>
+              <form id="uploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                  <input
+                    type="file"
+                    class="form-control-file"
+                    id="fileInput"
+                    name="file"
+                  />
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  onclick="uploadFile()"
+                >
+                  Upload
+                </button>
+              </form>
+
+              <!-- Progress bar for upload -->
+              <div
+                class="progress mt-3"
+                id="uploadProgressBarContainer"
+                style="display: none"
+              >
+                <div
+                  class="progress-bar"
+                  id="uploadProgressBar"
+                  role="progressbar"
+                  style="width: 0%"
+                  aria-valuenow="0"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                >
+                  0%
+                </div>
+              </div>
+
+              <hr />
+
+              <!-- Retrieve data from database -->
+              <h4>Retrieve Attendance Data</h4>
+              <form id="retrieveForm">
+                <div class="form-row d-flex ml-0">
+                  <div class="form-group mr-4">
+                    <label for="semesterType">Semester Type:</label>
+                    <select
+                      id="semesterType"
+                      class="form-control"
+                      style="width: 30vh"
+                    >
+                      <option value="Odd">Odd</option>
+                      <option value="Even">Even</option>
+                      <option value="Compact">Compact</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="yearInput">Year:</label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="yearInput"
+                      placeholder="e.g., 2025"
+                      min="2000"
+                      max="2100"
+                      style="width: 30vh"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  class="btn btn-primary mt-2"
+                  onclick="retrieveFile()"
+                >
+                  Retrieve Data
+                </button>
+              </form>
+
+              <h5 class="mt-4" id="loadedSemesterType">
+                Currently loaded semester type:
+              </h5>
+              <h5 class="mb-4" id="loadedYear">Currently loaded year:</h5>
+
+              <div class="form-check mb-2">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  value=""
+                  id="filterEXL"
+                  checked
+                />
+                <label class="form-check-label" for="filterEXL">
+                  Exclude EXL entries
+                </label>
+              </div>
+
+              <!-- Button to display DataFrame -->
+              <button
+                id="toggleDataFrameButton"
+                class="btn btn-secondary mt-3"
+                onclick="toggleDataFrame()"
+              >
+                Display DataFrame
+              </button>
+
+              <!-- Button to calculate percentage and group by NIM -->
+              <button
+                id="aggregateByNimButton"
+                class="btn btn-secondary mt-3"
+                onclick="aggregateByNIM()"
+              >
+                Calculate percentage - GroupBy NIM
+              </button>
+
+              <!-- Button to calculate percentage and group by NIM and COURSE ID -->
+              <button
+                id="aggregateByNimCourseButton"
+                class="btn btn-secondary mt-3"
+                onclick="aggregateByNimCourse()"
+              >
+                Calculate percentage - GroupBy NIM and COURSE CODE
+              </button>
+
+              <!-- Progress bar for aggregation -->
+              <div
+                class="progress mt-3"
+                id="aggregationProgressBarContainer"
+                style="display: none"
+              >
+                <div
+                  class="progress-bar"
+                  id="aggregationProgressBar"
+                  role="progressbar"
+                  style="width: 0%"
+                  aria-valuenow="0"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                >
+                  0%
+                </div>
+              </div>
+
+              <!-- Display DataFrame -->
+              <div id="dataFrameContainer" class="mt-4" style="display: none">
+                <div class="table-responsive">
+                  <!-- Add table-striped class to make rows striped -->
+                  <table
+                    id="dataFrameTable"
+                    class="table table-striped table-bordered"
+                  >
+                    <thead id="dataFrameTableHead"></thead>
+                    <tfoot id="dataFrameTableFoot"></tfoot>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Display Percentage - GroupBy NIM Table -->
+              <button
+                id="toggleNimPercentageTableButton"
+                class="btn btn-secondary mt-3"
+                onclick="toggleNimPercentageTable()"
+                style="display: none"
+              >
+                Display percentage - GroupBy NIM Table
+              </button>
+
+              <div
+                id="nimPercentageTableContainer"
+                class="mt-4"
+                style="display: none"
+              >
+                <div class="table-responsive">
+                  <table
+                    id="nimPercentageTable"
+                    class="table table-striped table-bordered"
+                  >
+                    <thead>
+                      <tr>
+                        <th>NIM</th>
+                        <th>NAME</th>
+                        <th>MAJOR</th>
+                        <th>Total Present</th>
+                        <th>Total Sessions</th>
+                        <th>Percentage Present</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <button
+                id="toggleNimCoursePercentageTableButton"
+                class="btn btn-secondary mt-3"
+                onclick="toggleNimCoursePercentageTable()"
+                style="display: none"
+              >
+                Display percentage - GroupBy NIM and COURSE CODE Table
+              </button>
+              <!-- Display NIM Course Aggregate DataFrame -->
+              <div
+                id="nimCourseAggregateContainer"
+                class="mt-4"
+                style="display: none"
+              >
+                <div class="table-responsive">
+                  <table
+                    id="nimCourseAggregateTable"
+                    class="table table-striped table-bordered"
+                  ></table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let dataTableInitialized = false;
+      let nimPercentageTableInitialized = false;
+
+      $(document).ready(function () {
+        // Custom filter function for percentages
+        $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+          if (
+            settings.nTable.id !== 'nimPercentageTable' &&
+            settings.nTable.id !== 'nimCourseAggregateTable'
+          )
+            return true;
+
+          let isValid = true;
+          let tableId = `#${settings.nTable.id}`;
+
+          $(`${tableId} .filters th`).each(function (index) {
+            let input = $(this).find('.filter-value');
+            let operator = $(this).find('.filter-operator').val();
+            let filterValue = input.val();
+
+            if (filterValue !== undefined && filterValue !== '') {
+              // Removing the %, then convert to number
+              let cellValue = parseFloat(data[index].replace('%', ''));
+
+              if (operator === '>=' && cellValue < parseFloat(filterValue)) {
+                isValid = false;
+              } else if (
+                operator === '<=' &&
+                cellValue > parseFloat(filterValue)
+              ) {
+                isValid = false;
+              } else if (
+                operator === '<' &&
+                cellValue >= parseFloat(filterValue)
+              ) {
+                isValid = false;
+              } else if (
+                operator === '>' &&
+                cellValue <= parseFloat(filterValue)
+              ) {
+                isValid = false;
+              }
+            }
+          });
+
+          return isValid;
+        });
+      });
+
+      function uploadFile() {
+        var form = $('#uploadForm')[0];
+        var formData = new FormData(form);
+        var xhr = new XMLHttpRequest();
+        var uploadProgressBarContainer = $('#uploadProgressBarContainer');
+        var uploadProgressBar = $('#uploadProgressBar');
+
+        xhr.upload.addEventListener('progress', function (e) {
+          if (e.lengthComputable) {
+            var percentComplete = (e.loaded / e.total) * 100;
+            uploadProgressBar.width(percentComplete + '%');
+            uploadProgressBar.attr('aria-valuenow', percentComplete);
+            uploadProgressBar.text(Math.round(percentComplete) + '%');
+          }
+        });
+
+        xhr.addEventListener('load', function () {
+          if (xhr.status === 200) {
+            var response = JSON.parse(xhr.responseText);
+            if (response.success) {
+              $('#loadedSemesterType').text(
+                `Currently loaded semester type: ${response.fileSemesterType}`
+              );
+              $('#loadedYear').text(
+                `Currently loaded year: ${response.fileYear}`
+              );
+              uploadProgressBar.text('Upload complete');
+              setTimeout(function () {
+                alert(response.success);
+                uploadProgressBarContainer.hide();
+              }, 500); // Delay to show the completed progress bar before hiding
+            } else {
+              alert(response.error);
+              uploadProgressBarContainer.hide();
+            }
+          } else {
+            alert('Error uploading file');
+            uploadProgressBarContainer.hide();
+          }
+        });
+
+        xhr.open('POST', '/upload', true);
+        xhr.send(formData);
+
+        uploadProgressBarContainer.show();
+      }
+
+      function retrieveFile() {
+        var semesterType = $('#semesterType').val();
+        var year = $('#yearInput').val();
+
+        if (!year) {
+          alert('Please enter a valid year.');
+          return;
+        }
+
+        $.ajax({
+          type: 'POST',
+          url: '/retrieve',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            semester_type: semesterType,
+            year: parseInt(year),
+          }),
+          success: function (response) {
+            if (response.success) {
+              $('#loadedSemesterType').text(
+                `Currently loaded semester type: ${response.fileSemesterType}`
+              );
+              $('#loadedYear').text(
+                `Currently loaded year: ${response.fileYear}`
+              );
+              alert('File successfully retrieved and saved.');
+            } else {
+              alert(response.error);
+            }
+          },
+          error: function () {
+            alert('Error retrieving file.');
+          },
+        });
+      }
+
+      function toggleDataFrame() {
+        var button = $('#toggleDataFrameButton');
+        var dataFrameContainer = $('#dataFrameContainer');
+        var filterEXL = $('#filterEXL').prop('checked');
+
+        if (dataFrameContainer.is(':visible')) {
+          // Hide the DataFrame and change button text to "Display DataFrame"
+          dataFrameContainer.hide();
+          button.text('Display DataFrame');
+        } else {
+          // Show the DataFrame and change button text to "Hide DataFrame"
+          $.ajax({
+            type: 'POST',
+            url: '/get_dataframe',
+            contentType: 'application/json',
+            data: JSON.stringify({
+              filterEXL: filterEXL,
+            }),
+            success: function (response) {
+              if (response.data) {
+                if (dataTableInitialized) {
+                  $('#dataFrameTable').DataTable().destroy();
+                  $('#dataFrameTable').empty();
+                }
+
+                const tableHead = $('#dataFrameTableHead');
+                const tableFoot = $('#dataFrameTableFoot');
+                const data = $(response.data);
+
+                const headers = data.find('thead th');
+                let headerHtml = '<tr>';
+                headers.each(function () {
+                  headerHtml += `<th>${$(this).text()}</th>`;
+                });
+                headerHtml += '</tr>';
+
+                tableHead.html(headerHtml);
+
+                $('#dataFrameTable').html(data.html());
+
+                // Row for filters
+                $('#dataFrameTable thead').append('<tr class="filters"></tr>');
+
+                // Add inputs
+                $('#dataFrameTable thead tr:eq(0) th').each(function () {
+                  $('#dataFrameTable .filters').append(
+                    `<th><input type="text" placeholder="Search..." style="width:100%" /></th>`
+                  );
+                });
+
+                $('#dataFrameTable').DataTable({
+                  pageLength: 10,
+                  lengthMenu: [
+                    [10, 25, 50, 100],
+                    [10, 25, 50, 100],
+                  ],
+                  responsive: true,
+                  autoWidth: false,
+                  searching: true,
+                  ordering: true, // Enable sorting in columns
+                  orderCellsTop: true,
+                  fixedHeader: true,
+                  dom: 'Bfrtip',
+                  buttons: [
+                    {
+                      extend: 'excelHtml5',
+                      text: 'Export to Excel',
+                      title: 'DataFrame',
+                    },
+                  ],
+
+                  initComplete: function () {
+                    //Bind listener to automatically filter
+                    this.api()
+                      .columns()
+                      .every(function () {
+                        var column = this;
+                        $(
+                          'input',
+                          $('#dataFrameTable .filters th').eq(column.index())
+                        ).on('keyup change', function () {
+                          column.search($(this).val()).draw();
+                        });
+                      });
+                  },
+                });
+
+                dataTableInitialized = true;
+                dataFrameContainer.show();
+                button.text('Hide DataFrame');
+              } else {
+                alert(response.error);
+              }
+            },
+            error: function () {
+              alert('Error fetching DataFrame');
+            },
+          });
+        }
+      }
+
+      function aggregateByNIM() {
+        var filterEXL = $('#filterEXL').prop('checked');
+        $.ajax({
+          type: 'POST',
+          url: '/aggregate_by_nim',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            filterEXL: filterEXL,
+          }),
+          success: function (response) {
+            if (response.success) {
+              // Display an alert when the calculation is completed
+              alert('Calculation complete');
+
+              // Show the button to display the percentage table
+              $('#toggleNimPercentageTableButton').show();
+            } else {
+              alert('Error: ' + response.error);
+            }
+          },
+          error: function () {
+            alert('Error occurred while aggregating by NIM.');
+          },
+        });
+      }
+
+      function aggregateByNimCourse() {
+        $.ajax({
+          type: 'POST',
+          url: '/aggregate_by_nim_course',
+          success: function (response) {
+            if (response.success) {
+              // Display an alert when the calculation is completed
+              alert('Calculation complete');
+
+              // Show the button to display the percentage table
+              $('#toggleNimCoursePercentageTableButton').show();
+            } else {
+              alert('Error: ' + response.error);
+            }
+          },
+          error: function () {
+            alert('Error occurred while aggregating by NIM and COURSE NAME.');
+          },
+        });
+      }
+
+      function toggleNimPercentageTable() {
+        var button = $('#toggleNimPercentageTableButton');
+        var tableContainer = $('#nimPercentageTableContainer');
+
+        if (tableContainer.is(':visible')) {
+          tableContainer.hide();
+          button.text('Display percentage - GroupBy NIM Table');
+        } else {
+          $.ajax({
+            type: 'GET',
+            url: '/get_nim_aggregate',
+            success: function (response) {
+              if (response.data) {
+                if ($.fn.DataTable.isDataTable('#nimPercentageTable')) {
+                  $('#nimPercentageTable').DataTable().destroy();
+                  $('#nimPercentageTable').empty();
+                }
+
+                $('#nimPercentageTable').html(response.data);
+
+                // Row for filters
+                $('#nimPercentageTable thead').append(
+                  '<tr class="filters"></tr>'
+                );
+
+                // Add inputs
+                $('#nimPercentageTable thead tr:eq(0) th').each(function (
+                  index
+                ) {
+                  // Check if it's a percentage column
+                  if (index === 6 || index === 7 || index === 8) {
+                    $('#nimPercentageTable .filters').append(`
+                      <th style='width: 20%;'>
+                        <select class="filter-operator">
+                          <option value=">=">>=</option>
+                          <option value=">">></option>
+                          <option value="<="><=</option>
+                          <option value="<"><</option>
+                        </select>
+                        <input type="number" class="filter-value" placeholder="Search..." style="width: 70%;">
+                      </th>
+                  `);
+                  } else {
+                    $('#nimPercentageTable .filters').append(
+                      `<th><input type="text" placeholder="Search..." style="width:100%"/></th>`
+                    );
+                  }
+                });
+
+                let table = $('#nimPercentageTable').DataTable({
+                  pageLength: 10,
+                  lengthMenu: [
+                    [10, 25, 50, 100],
+                    [10, 25, 50, 100],
+                  ],
+                  responsive: true,
+                  autoWidth: false,
+                  searching: true,
+                  ordering: true, // Enable sorting in columns
+                  orderCellsTop: true,
+                  fixedHeader: true,
+                  dom: 'Bfrtip',
+                  buttons: [
+                    {
+                      extend: 'excelHtml5',
+                      text: 'Export to Excel',
+                      title: 'NIM Attendance Percentage',
+                    },
+                  ],
+
+                  initComplete: function () {
+                    //Bind listener to automatically filter
+                    this.api()
+                      .columns()
+                      .every(function () {
+                        var column = this;
+                        var index = column.index();
+
+                        if (index === 6 || index === 7 || index === 8) return;
+                        $(
+                          'input',
+                          $('#nimPercentageTable .filters th').eq(
+                            column.index()
+                          )
+                        ).on('keyup change', function () {
+                          column.search($(this).val()).draw();
+                        });
+                      });
+
+                    // Apply percentage filters
+                    $('#nimPercentageTable .filters').on(
+                      'keyup change',
+                      'input.filter-value, select.filter-operator',
+                      function () {
+                        table.draw(); // Trigger DataTables filtering
+                      }
+                    );
+                  },
+                });
+
+                tableContainer.show();
+                button.text('Hide percentage - GroupBy NIM Table');
+              } else {
+                alert(response.error);
+              }
+            },
+            error: function () {
+              alert('Error fetching NIM percentage table.');
+            },
+          });
+        }
+      }
+
+      function toggleNimCoursePercentageTable() {
+        var button = $('#toggleNimCoursePercentageTableButton');
+        var tableContainer = $('#nimCourseAggregateContainer');
+        var filterEXL = $('#filterEXL').prop('checked');
+
+        if (tableContainer.is(':visible')) {
+          tableContainer.hide();
+          button.text(
+            'Display percentage - GroupBy NIM, COURSE CODE, COMPONENT Table'
+          );
+        } else {
+          $.ajax({
+            type: 'POST',
+            url: '/get_nim_course_aggregate',
+            contentType: 'application/json',
+            data: JSON.stringify({
+              filterEXL: filterEXL,
+            }),
+            success: function (response) {
+              if (response.data) {
+                if ($.fn.DataTable.isDataTable('#nimCourseAggregateTable')) {
+                  $('#nimCourseAggregateTable').DataTable().destroy();
+                  $('#nimCourseAggregateTable').empty();
+                }
+
+                $('#nimCourseAggregateTable').html(response.data);
+
+                // Row for filters
+                $('#nimCourseAggregateTable thead').append(
+                  '<tr class="filters"></tr>'
+                );
+
+                // Add inputs
+                $('#nimCourseAggregateTable thead tr:eq(0) th').each(function (
+                  index
+                ) {
+                  // Check if it's a percentage column
+                  if (
+                    index === 8 ||
+                    index === 9 ||
+                    index === 10 ||
+                    index === 11
+                  ) {
+                    $('#nimCourseAggregateTable .filters').append(`
+                      <th style='width: 20%;'>
+                        <select class="filter-operator">
+                          <option value=">=">>=</option>
+                          <option value=">">></option>
+                          <option value="<="><=</option>
+                          <option value="<"><</option>
+                        </select>
+                        <input type="number" class="filter-value" placeholder="Search..." style="width: 70%;">
+                      </th>
+                  `);
+                  } else {
+                    $('#nimCourseAggregateTable .filters').append(
+                      `<th><input type="text" placeholder="Search..." style="width:100%"/></th>`
+                    );
+                  }
+                });
+
+                let table = $('#nimCourseAggregateTable').DataTable({
+                  pageLength: 10,
+                  lengthMenu: [
+                    [10, 25, 50, 100],
+                    [10, 25, 50, 100],
+                  ],
+                  responsive: true,
+                  autoWidth: false,
+                  searching: true,
+                  ordering: true, // Enable sorting in columns
+                  orderCellsTop: true,
+                  fixedHeader: true,
+                  dom: 'Bfrtip',
+                  buttons: [
+                    {
+                      extend: 'excelHtml5',
+                      text: 'Export to Excel',
+                      title: 'NIM and Course ID Attendance Percentage',
+                    },
+                  ],
+
+                  initComplete: function () {
+                    //Bind listener to automatically filter
+                    this.api()
+                      .columns()
+                      .every(function () {
+                        var column = this;
+                        var index = column.index();
+
+                        if (
+                          index === 8 ||
+                          index === 9 ||
+                          index === 10 ||
+                          index === 11
+                        )
+                          return;
+                        $(
+                          'input',
+                          $('#nimCourseAggregateTable .filters th').eq(
+                            column.index()
+                          )
+                        ).on('keyup change', function () {
+                          column.search($(this).val()).draw();
+                        });
+                      });
+
+                    // Apply percentage filters
+                    $('#nimCourseAggregateTable .filters').on(
+                      'keyup change',
+                      'input.filter-value, select.filter-operator',
+                      function () {
+                        table.draw(); // Trigger DataTables filtering
+                      }
+                    );
+                  },
+                });
+
+                tableContainer.show();
+                button.text(
+                  'Hide percentage - GroupBy NIM and COURSE ID Table'
+                );
+              } else {
+                alert(response.error);
+              }
+            }, //WYSI
+            error: function () {
+              alert('Error fetching NIM and COURSE ID percentage table.');
+            },
+          });
+        }
+      }
+    </script>
+  </body>
+</html>
