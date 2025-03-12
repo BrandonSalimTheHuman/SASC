@@ -309,7 +309,7 @@ def aggregate_by_nim_course():
 
             # Merge with original dataframe to get 'BINUSIAN ID' and 'NAME'
             grouped = grouped.merge(
-                df[['NIM', 'COURSE CODE', 'BINUSIAN ID', 'NAME', 'COURSE NAME']].drop_duplicates(), 
+                df[['NIM', 'COURSE CODE', 'NAME', 'COURSE NAME']].drop_duplicates(), 
                 on=['NIM', 'COURSE CODE'], 
                 how='left'
             )
@@ -330,7 +330,11 @@ def aggregate_by_nim_course():
             grouped['PROJECTED_ATTENDANCE_SEMESTER'] = grouped['PROJECTED_ATTENDANCE_SEMESTER'].apply(lambda x: math.ceil(x))
 
             # Reorder columns for clarity
-            grouped = grouped[['NIM', 'BINUSIAN ID', 'NAME', 'COURSE CODE', 'COURSE NAME', 'COMPONENT', 'TOTAL_PRESENT', 'TOTAL_SESSIONS', 'TOTAL_SESSIONS_SEMESTER', 'PERCENTAGE_ATTENDANCE', 'PERCENTAGE_ATTENDANCE_SEMESTER', 'PROJECTED_ATTENDANCE_SEMESTER']]
+            grouped = grouped[['NIM', 'NAME', 'COURSE CODE', 'COURSE NAME', 'COMPONENT', 'TOTAL_PRESENT', 'TOTAL_SESSIONS', 'TOTAL_SESSIONS_SEMESTER', 'PERCENTAGE_ATTENDANCE', 'PERCENTAGE_ATTENDANCE_SEMESTER', 'PROJECTED_ATTENDANCE_SEMESTER']]
+
+            # TEMPORARY FILTER
+            exclude = ["Advanced in Business Application Development", "Data Structures", "Information Systems Analysis and Design", "User Experience Research and Design", "Web Application Development and Security"]
+            grouped = grouped[~grouped['COURSE NAME'].isin(exclude)]
 
             # Save the aggregated DataFrame
             aggregated_file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'nim_course_aggregate.csv')
@@ -551,8 +555,6 @@ def get_bar_chart_student_data():
         # Only show selected student
         student_rows = df[df['NIM'] == int(nim)]
 
-        print(student_rows)
-
         # If the student isn't in the semester, move on to the next one
         if student_rows.empty:
             results[current_semester] = 0
@@ -589,6 +591,15 @@ def get_bar_chart_student_data():
     # Sorting the dictionary so the semesters are in chronological order
     results_sorted = {semester: results[semester] for semester in sorted(results.keys(), key=semester_sort)}
 
+    # Finding the first semester where the student is enrolled
+    first_enrolled_semester = next((s for s in results_sorted.keys() if s not in not_enrolled), None)
+
+    if first_enrolled_semester is None:
+        return jsonify({'error': 'Student not found in any semester.'})
+
+    # Remove all semesters before it
+    results_sorted = {s: c for s, c in results_sorted.items() if semester_sort(s) >= semester_sort(first_enrolled_semester)}
+
     if len(results_sorted) < 21:
         return jsonify({"name": student_name, "not_enrolled": not_enrolled, "data": [{"semester": s, "count": c} for s, c in results_sorted.items()]})
     else:
@@ -599,11 +610,19 @@ def get_bar_chart_student_data():
 def get_bar_chart_course_data():
     data = request.get_json()
     course = data.get('course')
-    component = data.get('component')
+    components = data.get('components')
     value = data.get('value')
     semester_count = data.get('semester_count')
     threshold = data.get('threshold')
     divisor = data.get('divisor')
+
+    # If LEC/LAB is picked, query both LEC and LAB
+    if "LEC/LAB" in components:
+        components.remove("LEC/LAB")
+        components.extend(["LEC", "LAB"])
+
+    # Track if course has LAB
+    course_has_lab: False
 
     # Query all tables in the database, one for each semester
     all_entries = AttendanceFile.query.all()
@@ -623,57 +642,115 @@ def get_bar_chart_course_data():
         # Only show selected course
         course_rows = df[df['COURSE CODE'] == course]
 
-        # Show the correct component
-        course_rows = course_rows[course_rows['COMPONENT']== component]
+        # A dictionary to store the attendance per component per semester
+        semester_results = {'LEC/LAB': set(), 'EXL': None, 'BLK': None}
 
-        # If the course isn't in the semester, move on to the next one
-        if course_rows.empty:
-            continue  
-        
-        # Get coursename if it doesn't exist
-        if course_name is None:
-            course_name = course_rows.iloc[0]['COURSE NAME']
+        students_in_lec_and_leb = None
 
-        # Calculate attendance percentage per course
-        attendance = course_rows.groupby('NIM')['PRESENT'].sum() / course_rows.groupby('NIM')['SESSION ID NUM'].count() * 100
+        data_found = False
 
-        if divisor == 'Present':
-            # Calculate attendance percentage
-            attendance =course_rows.groupby('NIM')['PRESENT'].sum() / course_rows.groupby('NIM')['SESSION ID NUM'].count() * 100
-        elif divisor == 'Projected':
-            # Get total semester sessions
-            course_rows['TOTAL_SEMESTER_SESSIONS'] = (course_rows['SKS'] // 2) * 13
+        for component in components:
+            # Show the correct component
+            comp_rows = course_rows[course_rows['COMPONENT']== component]
 
-            # Get semester sessions
-            grouped = course_rows.groupby(['NIM']).agg(
-                TOTAL_PRESENT=('PRESENT', 'sum'),
-                TOTAL_SESSIONS=('SESSION ID NUM', 'count'),  
-                TOTAL_SEMESTER_SESSIONS=('TOTAL_SEMESTER_SESSIONS', 'first') 
-            ).reset_index()
-        
-            attendance = ((grouped['TOTAL_SEMESTER_SESSIONS'] - grouped['TOTAL_SESSIONS'] + grouped['TOTAL_PRESENT']) / grouped['TOTAL_SEMESTER_SESSIONS']) * 100
+            # If the course isn't in the semester, move on to next component
+            if comp_rows.empty:
+                continue  
+            
+            # If there's a single instance of comp_rows not being empty, the selected compoonents exist
+            if not data_found:
+                data_found = True
 
-        below_threshold = (attendance < threshold).sum()
+            # Check for lab
+            if component == "LAB":
+                course_has_lab = True
 
+            # Get coursename if it doesn't exist
+            if course_name is None:
+                course_name = comp_rows.iloc[0]['COURSE NAME']
+
+            if divisor == 'Present':
+                # Calculate attendance percentage
+                attendance = comp_rows.groupby('NIM')['PRESENT'].sum() / comp_rows.groupby('NIM')['SESSION ID NUM'].count() * 100
+            elif divisor == 'Projected':
+                # Get total semester sessions
+                comp_rows = comp_rows.copy()
+                comp_rows['TOTAL_SEMESTER_SESSIONS'] = (comp_rows['SKS'] // 2) * 13
+
+                # Get semester sessions
+                grouped = comp_rows.groupby(['NIM']).agg(
+                    TOTAL_PRESENT=('PRESENT', 'sum'),
+                    TOTAL_SESSIONS=('SESSION ID NUM', 'count'),  
+                    TOTAL_SEMESTER_SESSIONS=('TOTAL_SEMESTER_SESSIONS', 'first') 
+                )
+            
+                attendance = ((grouped['TOTAL_SEMESTER_SESSIONS'] - grouped['TOTAL_SESSIONS'] + grouped['TOTAL_PRESENT']) / grouped['TOTAL_SEMESTER_SESSIONS']) * 100
+
+            # Get student NIMs who are below the threshold
+            failing_students = set(attendance[attendance < threshold].index)
+
+            # Converting to percentage of students
+            if value == 'Percentage':
+                num_of_students = comp_rows['NIM'].nunique()
+                below_threshold = round((len(failing_students) / num_of_students * 100), 2) if num_of_students > 0 else 0
+            else: 
+                below_threshold = len(failing_students)
+            
+            # Store results properly
+            if component in ["LEC", "LAB"]:
+                if students_in_lec_and_leb is None:
+                    students_in_lec_and_leb = comp_rows['NIM'].nunique()
+                semester_results["LEC/LAB"].update(failing_students)  # Add all students below threshold to the set for LEC/LAB
+            else:
+                semester_results[component] = below_threshold
+
+        # Convert LEC/LAB from set to count of unique students
         if value == 'Percentage':
-            num_of_students = course_rows['NIM'].nunique()
-            results[current_semester] = round((int(below_threshold) / num_of_students * 100), 2)
-        
+            semester_results['LEC/LAB'] = round((len(semester_results['LEC/LAB']) / students_in_lec_and_leb * 100), 2) if students_in_lec_and_leb > 0 else 0
         else:
-            results[current_semester] = int(below_threshold)
+            semester_results['LEC/LAB'] = len(semester_results['LEC/LAB'])
+
+        results[current_semester] = semester_results
     
-    if not bool(results):
+    if not data_found:
         return jsonify({'error': 'Course not found in any semester.'})
     
     # Sorting the dictionary so the semesters are in chronological order
     results_sorted = {semester: results[semester] for semester in sorted(results.keys(), key=semester_sort)}
 
-    print(results_sorted.items())
+    # Limit to semester_count semesters
+    if len(results_sorted) > int(semester_count):
+        results_sorted = dict(list(results_sorted.items())[-int(semester_count):])
 
-    if len(results_sorted) < int(semester_count):
-        return jsonify({"name": course_name, "data": [{"semester": s, "count": c} for s, c in results_sorted.items()]})
-    else:
-        return jsonify({"name": course_name, "data": [{"semester": s, "count": c} for s, c in list(results_sorted.items())[-int(semester_count):]]})
+    # Convert results to the appropriate format for chart.js to understand
+    formatted_results = []
+    for semester, counts in results_sorted.items():
+        semester_data = []
+
+        # LEC/LAB, doesn't matter which one the if statement checks since there's only one combined option in frontend
+        # And the code above adds both LEC and LAB to components if that was chosen
+        if "LEC" in components:
+            semester_data.append({
+                "component": "LEC/LAB" if course_has_lab else "LEC",
+                "count": counts["LEC/LAB"]
+            })
+
+        # EXL & BLK
+        for comp in ["EXL", "BLK"]:
+            if comp in components:
+                semester_data.append({
+                    "component": comp,
+                    "count": counts[comp] if counts[comp] is not None else 'N/A' # If course component doesn't exist, return N/A
+                })
+
+        formatted_results.append({
+            "semester": semester,
+            "data": semester_data
+        })
+
+    print("Formatted", formatted_results)
+
+    return jsonify({"name": course_name, "data": formatted_results})
 
 @app.route('/get_bar_chart_student_course_data', methods=['POST'])
 def get_bar_chart_student_course_data():
@@ -682,12 +759,14 @@ def get_bar_chart_student_course_data():
     course = data.get('course')
     component = data.get('component')
     value = data.get('value')
+    max_semesters = data.get('semesters')
 
     # Query all tables in the database, one for each semester
     all_entries = AttendanceFile.query.all()
 
     # Dictionary to store results, and variable to store student name
     results = {}
+    not_enrolled = []
     course_name = None
     student_name = None
 
@@ -710,7 +789,9 @@ def get_bar_chart_student_course_data():
 
         # If the course isn't in the semester, move on to the next one
         if course_rows.empty:
-            continue  
+            results[current_semester] = 0
+            not_enrolled.append(current_semester)
+            continue
         
         # Get coursename if it doesn't exist
         if course_name is None or student_name is None:
@@ -733,7 +814,27 @@ def get_bar_chart_student_course_data():
     # Sorting the dictionary so the semesters are in chronological order
     results_sorted = {semester: results[semester] for semester in sorted(results.keys(), key=semester_sort)}
 
-    return jsonify({"course_name": course_name, "student_name": student_name, "data": [{"semester": s, "count": c} for s, c in results_sorted.items()]})
+    if len(results_sorted) > max_semesters:
+        # Keep the most recent x semesters, according to the max_semesters variable
+        max_results = dict(list(results_sorted.items())[-max_semesters:])
+    else:
+        max_results = results_sorted
+
+    # Finding the first semester where the student is enrolled
+    first_enrolled_semester = next((s for s in results_sorted.keys() if s not in not_enrolled), None)
+
+    if first_enrolled_semester is None:
+        return jsonify({'error': 'Student not found in any semester.'})
+    
+    # Continuously check if the oldest semester currently returned needs to be removed or not
+    while (oldest_returned := next(iter(max_results.keys()), None)) in not_enrolled:
+        if semester_sort(oldest_returned) < semester_sort(first_enrolled_semester):
+            del max_results[oldest_returned]
+            not_enrolled.remove(oldest_returned)
+        else:
+            break 
+
+    return jsonify({"course_name": course_name, "student_name": student_name, "not_enrolled": not_enrolled, "data": [{"semester": s, "count": c} for s, c in max_results.items()]})
 
 
 

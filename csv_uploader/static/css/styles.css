@@ -76,3 +76,15 @@ tr:nth-child(even) {
 .form-group label {
   display: block;
 }
+
+.dataTables_length select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 20px;
+  background: none;
+}
+
+.dataTables_length {
+  margin-left: 20px;
+}

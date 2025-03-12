@@ -28,6 +28,10 @@
     <script src="https://cdn.datatables.net/buttons/2.2.3/js/dataTables.buttons.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
     <script src="https://cdn.datatables.net/buttons/2.2.3/js/buttons.html5.min.js"></script>
+    <!-- Include Sheet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Include Excel JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="../static/css/styles.css" />
   </head>
@@ -458,7 +462,7 @@
                   ordering: true, // Enable sorting in columns
                   orderCellsTop: true,
                   fixedHeader: true,
-                  dom: 'Bfrtip',
+                  dom: 'Blfrtip',
                   buttons: [
                     {
                       extend: 'excelHtml5',
@@ -605,17 +609,28 @@
                   ordering: true, // Enable sorting in columns
                   orderCellsTop: true,
                   fixedHeader: true,
-                  dom: 'Bfrtip',
+                  dom: 'Blfrtip',
                   buttons: [
                     {
-                      extend: 'excelHtml5',
                       text: 'Export to Excel',
-                      title: 'NIM Attendance Percentage',
+                      action: function () {
+                        exportStyledTableToExcel('nim');
+                      },
                     },
                   ],
 
+                  // Red background
+                  createdRow: function (row, data, dataIndex) {
+                    let projectedAttendance = parseFloat(data[8]);
+                    if (projectedAttendance < 85) {
+                      $(row)
+                        .css('background-color', 'red')
+                        .css('color', 'white');
+                      $(row).addClass('data-red');
+                    }
+                  },
+
                   initComplete: function () {
-                    //Bind listener to automatically filter
                     this.api()
                       .columns()
                       .every(function () {
@@ -657,6 +672,154 @@
         }
       }
 
+      async function exportStyledTableToExcel(courseName) {
+        // Create new workbook
+        let workbook = new ExcelJS.Workbook();
+
+        // Array for headers
+        var headers = [];
+
+        // Worksheet and workbook name
+        var name = '';
+
+        // Holds all columns for a certain table, so that filters and the empty spaces are not included in the workbook
+        var columns = [];
+
+        // Fetch the correct table, name the sheet appropriately, and get the table headers
+        if (courseName === 'nim') {
+          var table = $('#nimPercentageTable').DataTable();
+
+          name = 'GROUPBY NIM Attendance';
+
+          columns = [
+            'NIM',
+            'NAME',
+            'MAJOR',
+            'TOTAL_PRESENT',
+            'TOTAL_SESSIONS',
+            'TOTAL_SEMESTER_SESSIONS',
+            'PERCENTAGE_ATTENDANCE',
+            'PERCENTAGE_ATTENDANCE_SEMESTER',
+            'PROJECTED_ATTENDANCE_SEMESTER',
+          ];
+
+          $('#nimPercentageTable thead th').each(function () {
+            // Get header text
+            let text = $(this).text().trim();
+            if (columns.includes(text)) {
+              // If one of the table columns
+              headers.push(text);
+            }
+          });
+        } else if (courseName === 'nimCourse') {
+          var table = $('#nimCourseAggregateTable').DataTable();
+
+          name = 'GROUPBY NIM & COURSE Attendance';
+
+          columns = [
+            'NIM',
+            'NAME',
+            'COURSE CODE',
+            'COURSE NAME',
+            'COMPONENT',
+            'TOTAL_PRESENT',
+            'TOTAL_SESSIONS',
+            'TOTAL_SESSIONS_SEMESTER',
+            'PERCENTAGE_ATTENDANCE',
+            'PERCENTAGE_ATTENDANCE_SEMESTER',
+            'PROJECTED_ATTENDANCE_SEMESTER',
+          ];
+
+          $('#nimCourseAggregateTable thead th').each(function () {
+            let text = $(this).text().trim();
+            if (columns.includes(text)) {
+              headers.push(text);
+            }
+          });
+        } else {
+          alert('Table not found');
+          return;
+        }
+
+        // Only get the visible rows
+        let visibleRows = table.rows({ search: 'applied' }).nodes();
+
+        // Add worksheet to workbook
+        var worksheet = workbook.addWorksheet(name);
+
+        // Add the headers to the worksheet, with borders and bolded
+        worksheet.addRow(headers).eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: '000000' } },
+            left: { style: 'thin', color: { argb: '000000' } },
+            bottom: { style: 'thin', color: { argb: '000000' } },
+            right: { style: 'thin', color: { argb: '000000' } },
+          };
+          cell.font = { bold: true };
+        });
+
+        // Addings rows into the worksheet, add it with a red fill if the datatables is red
+        $(visibleRows).each(function () {
+          let rowData = [];
+          let row = worksheet.addRow([]);
+
+          $(this)
+            .find('td')
+            .each(function (colIndex) {
+              // Get cell text
+              let cellValue = $(this).text().trim();
+              let cell = row.getCell(colIndex + 1);
+
+              // Assign the value
+              cell.value = cellValue;
+
+              // Assign borders
+              cell.border = {
+                top: { style: 'thin', color: { argb: '000000' } },
+                left: { style: 'thin', color: { argb: '000000' } },
+                bottom: { style: 'thin', color: { argb: '000000' } },
+                right: { style: 'thin', color: { argb: '000000' } },
+              };
+
+              // Assign red background if cell is red
+              if ($(this).parent().hasClass('data-red')) {
+                cell.fill = {
+                  type: 'pattern',
+                  pattern: 'solid',
+                  fgColor: { argb: 'FFFF0000' },
+                };
+              }
+            });
+        });
+
+        // Adjust each column's width to accomodate the longest value in that column
+        worksheet.columns.forEach((column) => {
+          // Initialize max length
+          let maxLength = 0;
+
+          // Loop throgh each cell, convert it to a string, and find the length of the longest value
+          column.eachCell({ includeEmpty: true }, (cell) => {
+            let cellText = cell.value ? cell.value.toString() : '';
+            maxLength = Math.max(maxLength, cellText.length);
+          });
+
+          // Set the column width to the longest value with a bit of padding
+          column.width = maxLength + 2;
+        });
+
+        // Save the file
+        let buffer = await workbook.xlsx.writeBuffer();
+        let blob = new Blob([buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        });
+        let link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        let semesterType = $('#loadedSemesterType').text().split(' ').pop();
+        let year = $('#loadedYear').text().split(' ').pop();
+        link.download = `${name} ${semesterType} ${year}.xlsx`;
+        link.click();
+      }
+
       function toggleNimCoursePercentageTable() {
         var button = $('#toggleNimCoursePercentageTableButton');
         var tableContainer = $('#nimCourseAggregateContainer');
@@ -694,12 +857,7 @@
                   index
                 ) {
                   // Check if it's a percentage column
-                  if (
-                    index === 8 ||
-                    index === 9 ||
-                    index === 10 ||
-                    index === 11
-                  ) {
+                  if (index >= 8) {
                     $('#nimCourseAggregateTable .filters').append(`
                       <th style='width: 20%;'>
                         <select class="filter-operator">
@@ -730,14 +888,26 @@
                   ordering: true, // Enable sorting in columns
                   orderCellsTop: true,
                   fixedHeader: true,
-                  dom: 'Bfrtip',
+                  dom: 'Blfrtip',
                   buttons: [
                     {
-                      extend: 'excelHtml5',
                       text: 'Export to Excel',
-                      title: 'NIM and Course ID Attendance Percentage',
+                      action: function () {
+                        exportStyledTableToExcel('nimCourse');
+                      },
                     },
                   ],
+
+                  // Red background
+                  createdRow: function (row, data, dataIndex) {
+                    let projectedAttendance = parseFloat(data[11]);
+                    if (projectedAttendance < 85) {
+                      $(row)
+                        .css('background-color', 'red')
+                        .css('color', 'white');
+                      $(row).addClass('data-red');
+                    }
+                  },
 
                   initComplete: function () {
                     //Bind listener to automatically filter
@@ -747,13 +917,7 @@
                         var column = this;
                         var index = column.index();
 
-                        if (
-                          index === 8 ||
-                          index === 9 ||
-                          index === 10 ||
-                          index === 11
-                        )
-                          return;
+                        if (index >= 8) return;
                         $(
                           'input',
                           $('#nimCourseAggregateTable .filters th').eq(

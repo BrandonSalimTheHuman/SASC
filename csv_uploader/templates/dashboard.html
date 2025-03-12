@@ -437,15 +437,17 @@
                     />
                   </div>
 
-                  <div class="ml-2 mr-4">
-                    <label for="courseComponentInput">Course Component:</label>
+                  <div class="form-group mr-4">
+                    <label for="courseComponentInput"
+                      >Course component(s):</label
+                    >
                     <select
                       id="courseComponentInput"
                       class="form-control"
-                      style="width: 12vw"
+                      multiple="multiple"
+                      style="display: flex; width: 20vw"
                     >
-                      <option value="LEC">LEC</option>
-                      <option value="LAB">LAB</option>
+                      <option value="LEC/LAB">LEC/LAB</option>
                       <option value="EXL">EXL</option>
                       <option value="BLK">BLK</option>
                     </select>
@@ -606,6 +608,19 @@
                       </option>
                     </select>
                   </div>
+
+                  <div class="form-group mr-4">
+                    <label for="semesterAmountStudentCourseInput"
+                      >Number of semesters to compare:</label
+                    >
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="semesterAmountStudentCourseInput"
+                      placeholder="No. of semesters.."
+                      style="width: 15vw"
+                    />
+                  </div>
                 </div>
 
                 <button
@@ -658,6 +673,7 @@
 
       $(document).ready(function () {
         $('#majorInputMultiple').select2();
+        $('#courseComponentInput').select2();
         $('#thresholdPieInput').val(50);
         $('#thresholdMajorInput').val(50);
         $('#thresholdStudentInput').val(50);
@@ -1003,13 +1019,18 @@
       function loadBarChartCourse() {
         var course = $('#courseInput').val();
         var value = $('#valueCourseInput').val();
-        var component = $('#courseComponentInput').val();
+        var components = $('#courseComponentInput').val();
         var semesterCount = $('#semesterAmountInput').val();
         var threshold = $('#thresholdCourseInput').val();
         var divisor = $('#divisorCourseInput').val();
 
         if (!course) {
           alert('Please enter Course Code.');
+          return;
+        }
+
+        if (components.length <= 0) {
+          alert('Choose at least 1 component');
           return;
         }
 
@@ -1044,7 +1065,7 @@
           contentType: 'application/json',
           data: JSON.stringify({
             course: course,
-            component: component,
+            components: components,
             value: value,
             semester_count: semesterCount,
             threshold: parseFloat(threshold),
@@ -1062,7 +1083,34 @@
             // Manually retrieving labels and values to preserve sorting
             let entries = data.data;
             let labels = entries.map((entry) => entry.semester);
-            let values = entries.map((entry) => entry.count);
+
+            // Loop through each component in each entry
+            let allComponents = new Set();
+            entries.forEach((entry) => {
+              entry.data.forEach((comp) => {
+                allComponents.add(comp.component);
+              });
+            });
+
+            let datasets = [];
+            allComponents.forEach((compName) => {
+              let dataValues = entries.map((entry) => {
+                let componentEntry = entry.data.find(
+                  (comp) => comp.component === compName
+                );
+                return componentEntry.count === 'N/A'
+                  ? null
+                  : componentEntry.count;
+              });
+
+              console.log(`Dataset for ${compName}:`, dataValues);
+
+              datasets.push({
+                label: `${course} - ${data.name} - ${compName} ${value} of students with <50% attendance`,
+                data: dataValues, // Setting to null so chart.js doesn't ignore it
+                borderWidth: 0,
+              });
+            });
 
             let ctx = document
               .getElementById('barChartCourse')
@@ -1071,13 +1119,7 @@
               type: 'bar',
               data: {
                 labels: labels,
-                datasets: [
-                  {
-                    label: `${course} - ${data.name} - ${component} ${value} of students with <50% attendance`,
-                    data: values,
-                    borderWidth: 0, // Removing default white border so it looks fine if the whole chart is one label
-                  },
-                ],
+                datasets: datasets,
               },
 
               // Displaying labels for values
@@ -1085,12 +1127,16 @@
                 plugins: {
                   datalabels: {
                     align: 'top',
-                    color: 'black',
+                    color: function (context) {
+                      const index = context.dataIndex;
+                      const value = context.dataset.data[index];
+                      return value === null ? 'red' : 'black';
+                    },
                     font: {
                       weight: 'bold',
                       size: 14,
                     },
-                    formatter: (value) => value,
+                    formatter: (value) => (value === null ? '-' : value),
                   },
                 },
               },
@@ -1108,6 +1154,7 @@
         var course = $('#courseStudentCourseInput').val();
         var component = $('#studentCourseComponentInput').val();
         var value = $('#valueStudentCourseInput').val();
+        var semesters = $('#semesterAmountStudentCourseInput').val();
 
         if (!nim) {
           alert('Please enter NIM.');
@@ -1116,6 +1163,21 @@
 
         if (!Number.isInteger(Number(nim))) {
           alert('Invalid NIM format');
+          return;
+        }
+
+        if (!semesters) {
+          alert('Please enter the number of semesters');
+          return;
+        }
+
+        if (!Number.isInteger(Number(semesters))) {
+          alert('Semester count must be an integer');
+          return;
+        }
+
+        if (parseInt(semesters) <= 0) {
+          alert('Semester count must be at least 1');
           return;
         }
 
@@ -1138,6 +1200,7 @@
             course: course,
             component: component,
             value: value,
+            semesters: parseInt(semesters),
           }),
           success: function (data) {
             if (data.error) {
@@ -1152,6 +1215,7 @@
             let entries = data.data;
             let labels = entries.map((entry) => entry.semester);
             let values = entries.map((entry) => entry.count);
+            let notEnrolled = data.not_enrolled;
 
             let ctx = document
               .getElementById('barChartStudentCourse')
@@ -1171,6 +1235,18 @@
 
               // Displaying labels for values
               options: {
+                scales: {
+                  x: {
+                    ticks: {
+                      color: function (value) {
+                        // Get all labels, and change to red if it's in notEnrolled array
+                        return notEnrolled.includes(value.tick.label)
+                          ? 'red'
+                          : 'black';
+                      },
+                    },
+                  },
+                },
                 plugins: {
                   datalabels: {
                     align: 'top',
