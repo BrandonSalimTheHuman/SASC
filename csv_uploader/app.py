@@ -16,6 +16,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# Database structure
 class AttendanceFile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     year = db.Column(db.Integer, nullable=False)
@@ -24,6 +25,7 @@ class AttendanceFile(db.Model):
 
     __table_args__ = (db.UniqueConstraint('year', 'semester_type', name='unique_semester'),)
 
+# Clear all locally saved files from previous runs
 def clear_upload_folder():
     files = glob.glob(os.path.join(app.config['UPLOAD_FOLDER'], '*'))
     for f in files:
@@ -45,14 +47,21 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 # Clear the upload folder when the app starts
 clear_upload_folder()
 
+# By default, load index.html
 @app.route('/')
 def index():
     return render_template('index.html')
 
+# Load dashboard.html
 @app.route('/dashboard')
 def dashboard():
     return render_template('dashboard.html')
 
+@app.route('/list_uploaded_files', methods=['GET'])
+def list_uploaded_files():
+    files = glob.glob(os.path.join(app.config['UPLOAD_FOLDER'], '*'))
+    filenames = [os.path.basename(f) for f in files]  
+    return jsonify({'files': filenames})
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -84,16 +93,15 @@ def upload_file():
         # Load the CSV into a pandas DataFrame
         df = pd.read_csv(file, delimiter=";", encoding="Windows-1252")
 
-        # Map values in "PRESENT" column: Y -> 1, N -> 0
-        if 'PRESENT' in df.columns:
-            df['PRESENT'] = df['PRESENT'].map({'Y': 1, 'N': 0})
-
         # Exclude rows where 'COURSE NAME' is one of the specified courses
         excluded_courses = ['Excellence Program I', 'English Plus Stage One', 'English Plus Stage Two', 'Academic Advisory']
         df = df[~df['COURSE NAME'].isin(excluded_courses)]
 
         # Exclude rows where 'MAJOR' is 'Non Degree Program'
         df = df[df['MAJOR'] != 'Non Degree Program']
+
+        # Filter out students with 0 sessions so far
+        df = df[df['SESSION DONE'] > 0]
 
         # Consider both "Fashion Design" and "Fashion Management" as just 'Fashion'
         df['MAJOR'].replace('Fashion Design', 'Fashion', inplace=True)
@@ -174,7 +182,7 @@ def get_dataframe():
         df = pd.read_csv(files[0], delimiter=";", encoding="Windows-1252")
 
         # Filter to show only the desired columns
-        filtered_columns = ["BINUSIAN ID", "NIM", "NAME", "MAJOR", "COMPONENT", "COURSE NAME", "SESSION ID NUM", "PRESENT"]
+        filtered_columns = ["NIM", "NAME", "MAJOR", "COURSE NAME", "COMPONENT", "SKS", "TOTAL SESSION", "SESSION DONE", "TOTAL ABSENCE", "MAX ABSENCE"]
 
         if set(filtered_columns).issubset(df.columns):
             # Filter the DataFrame to only include the specific columns
@@ -191,84 +199,6 @@ def get_dataframe():
             return jsonify({'error': 'Required columns are missing from the CSV file'})
 
 
-@app.route('/aggregate_by_nim', methods=['POST'])
-def aggregate_by_nim():
-    files = glob.glob(os.path.join(app.config['UPLOAD_FOLDER'], "main_data_*.csv"))
-
-    data = request.get_json()
-    filter_exl = data.get('filterEXL')
-
-    if len(files) == 0:
-        return jsonify({'error': 'No data found'})
-    elif len(files) > 1:
-        return jsonify({'error': 'Multiple files found in folder'})
-    else:
-        try:
-            df = pd.read_csv(files[0], delimiter=";", encoding="Windows-1252")
-
-            if filter_exl:
-                df = df[df['COMPONENT'] != 'EXL']
-
-            # Map the SKS to the total possible sessions till the end of the semester
-            def calculate_total_semester_sessions(sks):
-                # Convert SKS to expected semester sessions: floor(SKS/2) * 13
-                return (sks // 2) * 13
-
-            # Assuming SKS is already present in the data, you may need to adjust based on your actual data
-            if 'SKS' in df.columns:
-                df['TOTAL_SEMESTER_SESSIONS'] = df['SKS'].apply(calculate_total_semester_sessions)
-                
-            # Group by NIM, NAME, MAJOR and COURSE first to calculate total sessions per semester per course 
-            df_course_grouped = df.groupby(['NIM', 'NAME', 'MAJOR', 'COURSE CODE', 'COMPONENT']).agg(
-                TOTAL_PRESENT=('PRESENT', 'sum'),
-                TOTAL_SESSIONS=('SESSION ID NUM', 'count'),  
-                TOTAL_SEMESTER_SESSIONS=('TOTAL_SEMESTER_SESSIONS', 'first') 
-            ).reset_index()
-
-            # Group by NIM, NAME, and MAJOR to calculate total sessions and total present
-            grouped = df_course_grouped.groupby(['NIM', 'NAME', 'MAJOR']).agg(
-                TOTAL_PRESENT=('TOTAL_PRESENT', 'sum'),
-                TOTAL_SESSIONS=('TOTAL_SESSIONS', 'sum'),  # Current sessions
-                TOTAL_SEMESTER_SESSIONS=('TOTAL_SEMESTER_SESSIONS', 'sum')  # Expected total sessions till semester end
-            ).reset_index()
-
-            # Filter out students with 0 total sessions
-            grouped = grouped[grouped['TOTAL_SESSIONS'] > 0]
-
-            # Calculate percentage of attendance based on current sessions
-            grouped['PERCENTAGE_ATTENDANCE'] = (grouped['TOTAL_PRESENT'] / grouped['TOTAL_SESSIONS']) * 100
-
-            # Calculate percentage attendance so far for the semester
-            grouped['PERCENTAGE_ATTENDANCE_SEMESTER'] = (
-                grouped['TOTAL_PRESENT'] /
-                grouped['TOTAL_SEMESTER_SESSIONS']
-            ) * 100
-
-            # Calculated projected percentage attendance (assume all sessions that have yet to happen to be present)
-            grouped['PROJECTED_ATTENDANCE_SEMESTER'] = (
-                (grouped['TOTAL_SEMESTER_SESSIONS'] - 
-                grouped['TOTAL_SESSIONS'] + 
-                grouped['TOTAL_PRESENT'])/ 
-                grouped['TOTAL_SEMESTER_SESSIONS']
-            ) * 100
-
-            # Format the percentage to two decimal places and add % sign
-            grouped['PERCENTAGE_ATTENDANCE'] = grouped['PERCENTAGE_ATTENDANCE'].apply(lambda x: math.ceil(x))
-            grouped['PERCENTAGE_ATTENDANCE_SEMESTER'] = grouped['PERCENTAGE_ATTENDANCE_SEMESTER'].apply(lambda x: math.ceil(x))
-            grouped['PROJECTED_ATTENDANCE_SEMESTER'] = grouped['PROJECTED_ATTENDANCE_SEMESTER'].apply(lambda x: math.ceil(x))
-
-            # Exclude rows where PERCENTAGE_ATTENDANCE_SEMESTER is 100%
-            grouped = grouped[grouped['PERCENTAGE_ATTENDANCE_SEMESTER'] != '100.00%']
-
-            # Save the aggregated DataFrame
-            aggregated_file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'nim_aggregate.csv')
-            grouped.to_csv(aggregated_file_path, index=False, sep=";")
-
-            return jsonify({'success': 'Aggregation completed'})
-        except Exception as e:
-            return jsonify({'error': str(e)})
-
-
 @app.route('/get_nim_aggregate', methods=['GET'])
 def get_nim_aggregate():
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'nim_aggregate.csv')
@@ -279,8 +209,8 @@ def get_nim_aggregate():
     else:
         return jsonify({'error': 'No NIM Aggregate DataFrame available'})
 
-@app.route('/aggregate_by_nim_course', methods=['POST'])
-def aggregate_by_nim_course():
+@app.route('/aggregate_tables', methods=['POST'])
+def aggregate_tables():
     files = glob.glob(os.path.join(app.config['UPLOAD_FOLDER'], "main_data_*.csv"))
 
     if len(files) == 0:
@@ -290,59 +220,93 @@ def aggregate_by_nim_course():
     else:
         try:
             df = pd.read_csv(files[0], delimiter=";", encoding="Windows-1252")
-            
-            # Calculate total sessions for COURSE NAME
-            if 'SKS' in df.columns:
-                df['TOTAL_SESSIONS_SEMESTER'] = (df['SKS'] // 2) * 13
 
-            # Group by 'NIM' and 'COURSE ID' and calculate the count of 'PRESENT'
-            grouped = df.groupby(['NIM', 'COURSE CODE', 'COMPONENT']).agg({
-                'PRESENT': 'sum',
-                'SESSION ID NUM': 'count'
-            }).reset_index()
+            # Create a column for total present
+            df['TOTAL PRESENT'] = df['SESSION DONE'] - df['TOTAL ABSENCE']
 
-            # Rename columns for clarity
-            grouped.columns = ['NIM', 'COURSE CODE', 'COMPONENT', 'TOTAL_PRESENT', 'TOTAL_SESSIONS']
+            # Calculate attendance so far and semester attendance
+            df['PERCENTAGE_ATTENDANCE'] = (df['TOTAL PRESENT'] / df['SESSION DONE']) * 100
+            df['PERCENTAGE_ATTENDANCE_SEMESTER'] = (df['TOTAL PRESENT'] / df['TOTAL SESSION']) * 100
 
-            # Merge with total sessions to get total sessions per course
-            grouped = grouped.merge(df[['COURSE CODE', 'TOTAL_SESSIONS_SEMESTER']].drop_duplicates(), on='COURSE CODE', how='left')
-
-            # Merge with original dataframe to get 'BINUSIAN ID' and 'NAME'
-            grouped = grouped.merge(
-                df[['NIM', 'COURSE CODE', 'NAME', 'COURSE NAME']].drop_duplicates(), 
-                on=['NIM', 'COURSE CODE'], 
-                how='left'
-            )
-
-
-            grouped['PERCENTAGE_ATTENDANCE_SEMESTER'] = (grouped['TOTAL_PRESENT'] / grouped['TOTAL_SESSIONS_SEMESTER']) * 100
-            grouped['PERCENTAGE_ATTENDANCE'] = (grouped['TOTAL_PRESENT'] / grouped['TOTAL_SESSIONS']) * 100
-             # Calculated projected percentage attendance (assume all sessions that have yet to happen to be present)
-            grouped['PROJECTED_ATTENDANCE_SEMESTER'] = (
-                (grouped['TOTAL_SESSIONS_SEMESTER'] - 
-                grouped['TOTAL_SESSIONS'] + 
-                grouped['TOTAL_PRESENT'])/ 
-                grouped['TOTAL_SESSIONS_SEMESTER']
+             # Calculate projected percentage attendance (assume all sessions that have yet to happen to be present)
+            df['PROJECTED_ATTENDANCE_SEMESTER'] = (
+                1 - 
+                (df['TOTAL ABSENCE'] / 
+                df['TOTAL SESSION'])
             ) * 100
             
-            grouped['PERCENTAGE_ATTENDANCE'] = grouped['PERCENTAGE_ATTENDANCE'].apply(lambda x: math.ceil(x))
-            grouped['PERCENTAGE_ATTENDANCE_SEMESTER'] = grouped['PERCENTAGE_ATTENDANCE_SEMESTER'].apply(lambda x: math.ceil(x))
-            grouped['PROJECTED_ATTENDANCE_SEMESTER'] = grouped['PROJECTED_ATTENDANCE_SEMESTER'].apply(lambda x: math.ceil(x))
+            # Format percentages
+            df[['PERCENTAGE_ATTENDANCE', 'PERCENTAGE_ATTENDANCE_SEMESTER', 'PROJECTED_ATTENDANCE_SEMESTER']] = df[
+                ['PERCENTAGE_ATTENDANCE', 'PERCENTAGE_ATTENDANCE_SEMESTER', 'PROJECTED_ATTENDANCE_SEMESTER']
+            ].round(2)
 
-            # Reorder columns for clarity
-            grouped = grouped[['NIM', 'NAME', 'COURSE CODE', 'COURSE NAME', 'COMPONENT', 'TOTAL_PRESENT', 'TOTAL_SESSIONS', 'TOTAL_SESSIONS_SEMESTER', 'PERCENTAGE_ATTENDANCE', 'PERCENTAGE_ATTENDANCE_SEMESTER', 'PROJECTED_ATTENDANCE_SEMESTER']]
+            df['ELIGIBLE'] = df['TOTAL ABSENCE'] <= df['MAX ABSENCE']
 
-            # TEMPORARY FILTER
-            exclude = ["Advanced in Business Application Development", "Data Structures", "Information Systems Analysis and Design", "User Experience Research and Design", "Web Application Development and Security"]
-            grouped = grouped[~grouped['COURSE NAME'].isin(exclude)]
+            # Identify courses that have both LEC and LAB, where lec_lab_courses is a list of course codes with both LEC and LAB
+            lec_lab_courses = df[df['COMPONENT'].isin(['LEC', 'LAB'])].groupby('COURSE CODE')['COMPONENT'].nunique()
+            lec_lab_courses = lec_lab_courses[lec_lab_courses > 1].index.tolist()
+
+            # Find students who failed either LEC or LAB for one of those courses
+            failed_students = df[
+                (df['COURSE CODE'].isin(lec_lab_courses)) &
+                (df['COMPONENT'].isin(['LEC', 'LAB'])) & 
+                (df['ELIGIBLE'] == False)
+            ][['NIM', 'COURSE CODE']]
+
+            # Find all rows where the eligible column needs to be set to false, based on the failed students
+            failed_rows = (
+                df.set_index(['NIM', 'COURSE CODE']).index.isin(
+                    failed_students.set_index(['NIM', 'COURSE CODE']).index
+                ) &
+                (df['COMPONENT'].isin(['LEC', 'LAB']))  
+            )
+
+            # A new, temporary column to track indirect fails
+            df['INDIRECT FAIL'] = False
+
+            # Find all rows that will be indirect fails
+            df.loc[failed_rows & (df['ELIGIBLE'] == True), 'INDIRECT FAIL'] = True  
+
+            # Set all eligible to false for failed rows
+            df.loc[failed_rows, 'ELIGIBLE'] = False
+
+            # Drop columns
+            df.drop(columns=['ACAD CAREER', 'STRM', 'BINUSIAN ID', 'TOTAL ABSENCE', 'MAX ABSENCE', 'SKS'], inplace=True)
+
+            # Rename columns
+            df.columns = ['NIM', 'NAME', 'MAJOR', 'COURSE CODE', 'COURSE NAME', 'CLASS', 'COMPONENT', 'TOTAL SEMESTER SESSIONS', 'SESSIONS DONE', 'TOTAL PRESENT', 'ATTENDANCE %', 'ATTENDANCE SEMESTER %', 'PROJECTED ATTENDANCE SEMESTER %', 'ELIGIBLE', 'INDIRECT FAIL']
 
             # Save the aggregated DataFrame
             aggregated_file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'nim_course_aggregate.csv')
-            grouped.to_csv(aggregated_file_path, index=False, sep=";")
+            df.to_csv(aggregated_file_path, index=False, sep=";")
 
-            # Debugging output
-            print("Aggregated DataFrame:")
-            print(grouped)
+            # Further processing for NIM table
+            # Find number of unique course codes for each student
+            enrolled_courses = df.groupby('NIM')['COURSE CODE'].nunique().reset_index()
+            enrolled_courses.columns = ['NIM', 'NUMBER OF ENROLLED COURSES']
+
+            # Find number of failed courses with unique course codes
+            failed_courses = df[df['ELIGIBLE'] == False].groupby('NIM')['COURSE CODE'].nunique().reset_index()
+            failed_courses.columns = ['NIM', 'NUMBER OF FAILED COURSES']
+
+            # Merge results to create a NIM, number of enrolled courses, and number of failed courses table
+            grouped_nim = enrolled_courses.merge(failed_courses, on='NIM', how='left').fillna(0)
+
+            # fillna forces column into float, so converting back to int
+            grouped_nim['NUMBER OF FAILED COURSES'] = grouped_nim['NUMBER OF FAILED COURSES'].astype(int)
+
+            # Calculate the percentage of failed courses
+            grouped_nim['PERCENTAGE OF FAILED COURSES'] = round(((grouped_nim['NUMBER OF FAILED COURSES'] / grouped_nim['NUMBER OF ENROLLED COURSES']) * 100), 2)
+
+            # Merge grouped_nim with NAME and MAJOR columns
+            grouped_nim = df[['NIM', 'NAME', 'MAJOR']].drop_duplicates().merge(grouped_nim, on='NIM', how='left')
+
+            # Reorder columns
+            grouped_nim.columns = ['NIM', 'NAME', 'MAJOR', 'NUMBER OF ENROLLED COURSES', 'NUMBER OF FAILED COURSES', 'PERCENTAGE OF FAILED COURSES']
+
+            # Save the GROUPBY NIM table
+            nim_aggregated_file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'nim_aggregate.csv')
+            grouped_nim.to_csv(nim_aggregated_file_path, index=False, sep=";")
 
             return jsonify({'success': 'Aggregation completed'})
         except Exception as e:
@@ -416,29 +380,14 @@ def get_pie_chart_data():
     
     if divisor == 'Present':
         # Calculate attendance percentage
-        attendance = df.groupby('NIM')['PRESENT'].sum() / df.groupby('NIM')['SESSION ID NUM'].count() * 100
+        attendance = (1 - (df.groupby('NIM')['TOTAL ABSENCE'].sum() / df.groupby('NIM')['SESSION DONE'].sum())) * 100
     elif divisor == 'Projected':
-        # Get total semester sessions
-        df['TOTAL_SEMESTER_SESSIONS'] = (df['SKS'] // 2) * 13
-
-        # Get semester sessions per course
-        df_grouped = df.groupby(['NIM', 'COURSE CODE', 'COMPONENT']).agg(
-            TOTAL_PRESENT=('PRESENT', 'sum'),
-            TOTAL_SESSIONS=('SESSION ID NUM', 'count'),  
-            TOTAL_SEMESTER_SESSIONS=('TOTAL_SEMESTER_SESSIONS', 'first') 
-        ).reset_index()
-
-        # Now per student
-        grouped = df_grouped.groupby(['NIM']).agg(
-            TOTAL_PRESENT=('TOTAL_PRESENT', 'sum'),
-            TOTAL_SESSIONS=('TOTAL_SESSIONS', 'sum'),  
-            TOTAL_SEMESTER_SESSIONS=('TOTAL_SEMESTER_SESSIONS', 'sum') 
-        ).reset_index()
-        
-        attendance = ((grouped['TOTAL_SEMESTER_SESSIONS'] - grouped['TOTAL_SESSIONS'] + grouped['TOTAL_PRESENT']) / grouped['TOTAL_SEMESTER_SESSIONS']) * 100
+        # Calculate projected attendance
+        attendance = (1 - (df.groupby('NIM')['TOTAL ABSENCE'].sum() / df.groupby('NIM')['TOTAL SESSION'].sum())) * 100
     else:
         return jsonify({'error': 'Invalid divisor for attendance calculation'})
 
+    print(attendance)
     # Count students below and above the threshold
     below_threshold = (attendance < threshold).sum()
     above_threshold = (attendance >= threshold).sum()
@@ -472,26 +421,10 @@ def get_bar_chart_major_data():
 
     if divisor == 'Present':
         # Calculate attendance percentage
-        attendance = df.groupby('NIM')['PRESENT'].sum() / df.groupby('NIM')['SESSION ID NUM'].count() * 100
+        attendance = (1 - (df.groupby('NIM')['TOTAL ABSENCE'].sum() / df.groupby('NIM')['SESSION DONE'].sum())) * 100
     elif divisor == 'Projected':
-        # Get total semester sessions
-        df['TOTAL_SEMESTER_SESSIONS'] = (df['SKS'] // 2) * 13
-
-        # Get semester sessions per course
-        df_grouped = df.groupby(['NIM', 'COURSE CODE', 'COMPONENT']).agg(
-            TOTAL_PRESENT=('PRESENT', 'sum'),
-            TOTAL_SESSIONS=('SESSION ID NUM', 'count'),  
-            TOTAL_SEMESTER_SESSIONS=('TOTAL_SEMESTER_SESSIONS', 'first') 
-        ).reset_index()
-
-        # Now per student
-        grouped = df_grouped.groupby(['NIM']).agg(
-            TOTAL_PRESENT=('TOTAL_PRESENT', 'sum'),
-            TOTAL_SESSIONS=('TOTAL_SESSIONS', 'sum'),  
-            TOTAL_SEMESTER_SESSIONS=('TOTAL_SEMESTER_SESSIONS', 'sum') 
-        )
-        
-        attendance = ((grouped['TOTAL_SEMESTER_SESSIONS'] - grouped['TOTAL_SESSIONS'] + grouped['TOTAL_PRESENT']) / grouped['TOTAL_SEMESTER_SESSIONS']) * 100
+        # Calculate projected attendance
+        attendance = (1 - (df.groupby('NIM')['TOTAL ABSENCE'].sum() / df.groupby('NIM')['TOTAL SESSION'].sum())) * 100
 
     # For all students and their major
     df_students = df[['NIM', 'MAJOR']].drop_duplicates()  
@@ -565,23 +498,17 @@ def get_bar_chart_student_data():
         if student_name is None:
             student_name = student_rows.iloc[0]['NAME']
 
-        if divisor == 'Present':
-        # Calculate attendance percentage
-            attendance = student_rows.groupby(['COURSE CODE', 'COMPONENT'])['PRESENT'].sum() / student_rows.groupby(['COURSE CODE', 'COMPONENT'])['SESSION ID NUM'].count() * 100
-        elif divisor == 'Projected':
-            # Get total semester sessions
-            student_rows['TOTAL_SEMESTER_SESSIONS'] = (student_rows['SKS'] // 2) * 13
+        if divisor == 'Max':
+            below_threshold = (student_rows['TOTAL ABSENCE'] > student_rows['MAX ABSENCE']).sum()
+        else:
+            if divisor == 'Present':
+            # Calculate attendance percentage
+                attendance = (1 - (student_rows['TOTAL ABSENCE'] / student_rows['SESSION DONE'])) * 100
+            elif divisor == 'Projected':
+                # Calculate projected attendance
+                attendance = (1 - (student_rows['TOTAL ABSENCE'] / student_rows['TOTAL SESSION'])) * 100
 
-            # Get semester sessions per course
-            grouped = student_rows.groupby(['COURSE CODE', 'COMPONENT']).agg(
-                TOTAL_PRESENT=('PRESENT', 'sum'),
-                TOTAL_SESSIONS=('SESSION ID NUM', 'count'),  
-                TOTAL_SEMESTER_SESSIONS=('TOTAL_SEMESTER_SESSIONS', 'first') 
-            ).reset_index()
-        
-            attendance = ((grouped['TOTAL_SEMESTER_SESSIONS'] - grouped['TOTAL_SESSIONS'] + grouped['TOTAL_PRESENT']) / grouped['TOTAL_SEMESTER_SESSIONS']) * 100
-
-        below_threshold = (attendance < threshold).sum()
+            below_threshold = (attendance < threshold).sum()
 
         results[current_semester] = int(below_threshold)
     
@@ -622,7 +549,7 @@ def get_bar_chart_course_data():
         components.extend(["LEC", "LAB"])
 
     # Track if course has LAB
-    course_has_lab: False
+    course_has_lab = False
 
     # Query all tables in the database, one for each semester
     all_entries = AttendanceFile.query.all()
@@ -645,7 +572,7 @@ def get_bar_chart_course_data():
         # A dictionary to store the attendance per component per semester
         semester_results = {'LEC/LAB': set(), 'EXL': None, 'BLK': None}
 
-        students_in_lec_and_leb = None
+        students_in_lec_and_lab = None
 
         data_found = False
 
@@ -668,26 +595,24 @@ def get_bar_chart_course_data():
             # Get coursename if it doesn't exist
             if course_name is None:
                 course_name = comp_rows.iloc[0]['COURSE NAME']
-
-            if divisor == 'Present':
-                # Calculate attendance percentage
-                attendance = comp_rows.groupby('NIM')['PRESENT'].sum() / comp_rows.groupby('NIM')['SESSION ID NUM'].count() * 100
-            elif divisor == 'Projected':
-                # Get total semester sessions
-                comp_rows = comp_rows.copy()
-                comp_rows['TOTAL_SEMESTER_SESSIONS'] = (comp_rows['SKS'] // 2) * 13
-
-                # Get semester sessions
-                grouped = comp_rows.groupby(['NIM']).agg(
-                    TOTAL_PRESENT=('PRESENT', 'sum'),
-                    TOTAL_SESSIONS=('SESSION ID NUM', 'count'),  
-                    TOTAL_SEMESTER_SESSIONS=('TOTAL_SEMESTER_SESSIONS', 'first') 
-                )
             
-                attendance = ((grouped['TOTAL_SEMESTER_SESSIONS'] - grouped['TOTAL_SESSIONS'] + grouped['TOTAL_PRESENT']) / grouped['TOTAL_SEMESTER_SESSIONS']) * 100
+            if divisor == 'Max':
+                # Get NIM for all students where total absence ? max absence
+                failing_students = set(comp_rows.loc[comp_rows['TOTAL ABSENCE'] > comp_rows['MAX ABSENCE'], 'NIM'])
+            else:
+                if divisor == 'Present':
+                    # Calculate attendance percentage
+                    attendance = (1 - (comp_rows['TOTAL ABSENCE'] / comp_rows['SESSION DONE'])) * 100
+                elif divisor == 'Projected':
+                    # Calculate projected attendance
+                    attendance = (1 - (comp_rows['TOTAL ABSENCE'] / comp_rows['TOTAL SESSION'])) * 100
+                
+                attendance.index = comp_rows['NIM']
 
-            # Get student NIMs who are below the threshold
-            failing_students = set(attendance[attendance < threshold].index)
+                # Get student NIMs who are below the threshold
+                failing_students = set(attendance[attendance < threshold].index)
+
+            # print(failing_students)
 
             # Converting to percentage of students
             if value == 'Percentage':
@@ -696,17 +621,19 @@ def get_bar_chart_course_data():
             else: 
                 below_threshold = len(failing_students)
             
-            # Store results properly
+            # Store results fr LEC and LAB components
             if component in ["LEC", "LAB"]:
-                if students_in_lec_and_leb is None:
-                    students_in_lec_and_leb = comp_rows['NIM'].nunique()
+                if students_in_lec_and_lab is None:
+                    students_in_lec_and_lab = comp_rows['NIM'].nunique()
                 semester_results["LEC/LAB"].update(failing_students)  # Add all students below threshold to the set for LEC/LAB
             else:
                 semester_results[component] = below_threshold
 
-        # Convert LEC/LAB from set to count of unique students
-        if value == 'Percentage':
-            semester_results['LEC/LAB'] = round((len(semester_results['LEC/LAB']) / students_in_lec_and_leb * 100), 2) if students_in_lec_and_leb > 0 else 0
+        # Convert LEC/LAB from set to count of unique students. If no students, return 'N/A', else calculate results based on percentage of number
+        if students_in_lec_and_lab is None:
+            semester_results["LEC/LAB"] = "N/A"
+        elif value == 'Percentage':
+            semester_results['LEC/LAB'] = round((len(semester_results['LEC/LAB']) / students_in_lec_and_lab * 100), 2) if students_in_lec_and_lab > 0 else 0
         else:
             semester_results['LEC/LAB'] = len(semester_results['LEC/LAB'])
 
@@ -748,8 +675,6 @@ def get_bar_chart_course_data():
             "data": semester_data
         })
 
-    print("Formatted", formatted_results)
-
     return jsonify({"name": course_name, "data": formatted_results})
 
 @app.route('/get_bar_chart_student_course_data', methods=['POST'])
@@ -770,6 +695,8 @@ def get_bar_chart_student_course_data():
     course_name = None
     student_name = None
 
+    checked_csvs = 0
+
     # Loop through all tables
     for entry in all_entries:
         # Construct the current entry's semester
@@ -777,6 +704,9 @@ def get_bar_chart_student_course_data():
 
         # Load CSV
         df = pd.read_csv(io.BytesIO(entry.csv_file), delimiter=";", encoding="Windows-1252")
+
+        # Update count of checked CSVs
+        checked_csvs += 1
 
         # Only show selected student
         student_rows = df[df['NIM'] == int(nim)]
@@ -798,17 +728,18 @@ def get_bar_chart_student_course_data():
             course_name = course_rows.iloc[0]['COURSE NAME']
             student_name = course_rows.iloc[0]['NAME']
 
-        # Calculate attendance percentage per course
-        attendance = course_rows['PRESENT'].sum()
+        # Calculate number of present sessions
+        attendance = course_rows['SESSION DONE'] - course_rows['TOTAL ABSENCE']
 
         if value == 'Percentage':
-            sessions = course_rows['SESSION ID NUM'].count()
-            results[current_semester] = round((int(attendance) / int(sessions) * 100), 2)
+            sessions = course_rows['SESSION DONE']
+            results[current_semester] = round((int(attendance.iloc[0]) / int(sessions.iloc[0]) * 100), 2)
         
         else:
-            results[current_semester] = int(attendance)
-    
-    if not bool(results):
+            results[current_semester] = int(attendance.iloc[0])
+
+
+    if len(not_enrolled) == checked_csvs:
         return jsonify({'error': 'Course and student combination not found in any semester.'})
     
     # Sorting the dictionary so the semesters are in chronological order

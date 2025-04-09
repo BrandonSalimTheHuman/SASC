@@ -51,9 +51,11 @@
               <h1 class="card-title mb-4">
                 BINUS Senayan - Students' Attendance Data - Dashboard
               </h1>
+              <!-- Pie chart that compares students above and below an attendance threshold for one major, and one semester-->
               <h4 class="mt-3 mb-3">Pie chart for 1 major, 1 semester</h4>
               <form id="retrieveForm">
                 <div class="form-row d-flex ml-0">
+                  <!-- Semester type input -->
                   <div class="form-group mr-4">
                     <label for="semesterType">Semester Type:</label>
                     <select
@@ -67,6 +69,7 @@
                     </select>
                   </div>
 
+                  <!-- Year input -->
                   <div class="form-group mr-4">
                     <label for="yearInput">Year:</label>
                     <input
@@ -78,6 +81,7 @@
                     />
                   </div>
 
+                  <!-- Choosing if the results uses the number of students or the percentage of students against all students -->
                   <div class="form-group mr-4">
                     <label for="valueMajorInput">Value:</label>
                     <select
@@ -94,6 +98,7 @@
                     </select>
                   </div>
 
+                  <!-- Attendance threshold input -->
                   <div class="form-group mr-4">
                     <label for="thresholdPieInput"
                       >Minimum attendance (%):</label
@@ -109,6 +114,7 @@
                     />
                   </div>
 
+                  <!-- Choose between currently finished sessions or entire semester's sessions -->
                   <div class="form-group mr-4">
                     <label for="divisorPieInput"
                       >Attendance calculated based on:</label
@@ -127,6 +133,7 @@
                     </select>
                   </div>
 
+                  <!-- List of all majors that can be chosen -->
                   <div class="form-group mr-4">
                     <label for="majorInput">Major:</label>
                     <select
@@ -155,6 +162,7 @@
                   </div>
                 </div>
 
+                <!-- Button to calculate and create the pie chart -->
                 <button
                   type="button"
                   class="btn btn-primary mt-2 mb-4"
@@ -163,6 +171,7 @@
                   Create pie chart
                 </button>
 
+                <!-- Button to clear the pie chart -->
                 <button
                   type="button"
                   class="btn btn-danger mt-2 mb-4 ml-4 none"
@@ -173,6 +182,7 @@
                   Clear pie chart
                 </button>
               </form>
+              <!-- Canvas for the pie chart to go on -->
               <div
                 class="chart mt-3 mb-5"
                 style="justify-content: center; width: 100%"
@@ -190,9 +200,11 @@
                 </div>
               </div>
 
+              <!-- Bar chart that compares students under an attendance threshold across all majors, for 1 semester -->
               <h4 class="mt-3 mb-3">Bar chart to compare majors</h4>
               <form id="retrieveForm">
                 <div class="form-row d-flex ml-0">
+                  <!-- Semester type input -->
                   <div class="form-group mr-4">
                     <label for="semesterTypeMajor">Semester Type:</label>
                     <select
@@ -206,6 +218,7 @@
                     </select>
                   </div>
 
+                  <!-- Year input -->
                   <div class="form-group mr-4">
                     <label for="yearInputMajor">Year:</label>
                     <input
@@ -217,6 +230,7 @@
                     />
                   </div>
 
+                  <!-- Choosing if the results uses the number of students or the percentage of students against all students -->
                   <div class="form-group mr-4">
                     <label for="valueInput">Value:</label>
                     <select
@@ -233,6 +247,7 @@
                     </select>
                   </div>
 
+                  <!-- Attendance threshold input -->
                   <div class="form-group mr-4">
                     <label for="thresholdMajorInput"
                       >Minimum attendance (%):</label
@@ -248,6 +263,7 @@
                     />
                   </div>
 
+                  <!-- Choose between currently finished sessions or entire semester's sessions -->
                   <div class="form-group mr-4">
                     <label for="divisorMajorInput"
                       >Attendance calculated based on:</label
@@ -266,6 +282,7 @@
                     </select>
                   </div>
 
+                  <!-- List of all majors that can be chosen -->
                   <div class="form-group mr-4">
                     <label for="majorInputMultiple">Majors:</label>
                     <select
@@ -303,6 +320,7 @@
                   </div>
                 </div>
 
+                <!-- Button to calculate and create bar chart -->
                 <button
                   type="button"
                   class="btn btn-primary mt-2 mb-4"
@@ -311,6 +329,7 @@
                   Create bar chart - major
                 </button>
 
+                <!-- Button to clear bar chart -->
                 <button
                   type="button"
                   class="btn btn-danger mt-2 mb-4 ml-4 none"
@@ -322,6 +341,7 @@
                 </button>
               </form>
 
+              <!-- Canvas for the bar chart to go on -->
               <div
                 class="chart mt-3"
                 style="justify-content: center; width: 100%"
@@ -339,9 +359,11 @@
                 </div>
               </div>
 
+              <!-- Bar chart to compare the number of failed courses per semester for one student -->
               <h4 class="mt-3 mb-3">Bar chart to monitor one student</h4>
               <form id="retrieveForm">
                 <div class="form-row d-flex ml-0">
+                  <!-- NIM input -->
                   <div class="form-group mr-4">
                     <label for="nimInput">NIM:</label>
                     <input
@@ -353,21 +375,7 @@
                     />
                   </div>
 
-                  <div class="form-group mr-4">
-                    <label for="thresholdStudentInput"
-                      >Minimum attendance (%):</label
-                    >
-                    <input
-                      type="number"
-                      class="form-control"
-                      id="thresholdStudentInput"
-                      min="0"
-                      max="100"
-                      placeholder="Enter attendance threshold.."
-                      style="width: 15vw"
-                    />
-                  </div>
-
+                  <!-- Choose between the currently finished sessions, all of the semester's sessions, or automatically use the max absence from the data -->
                   <div class="form-group mr-4">
                     <label for="divisorStudentInput"
                       >Attendance calculated based on:</label
@@ -383,10 +391,28 @@
                       <option value="Projected">
                         All semester sessions with projected attendance
                       </option>
+                      <option value="Max">Total absence vs Max absence</option>
                     </select>
+                  </div>
+
+                  <!-- Attendance threshold input -->
+                  <div class="form-group mr-4">
+                    <label for="thresholdStudentInput"
+                      >Minimum attendance (%):</label
+                    >
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="thresholdStudentInput"
+                      min="0"
+                      max="100"
+                      placeholder="Enter attendance threshold.."
+                      style="width: 15vw"
+                    />
                   </div>
                 </div>
 
+                <!-- Button to calculate and create bar chart -->
                 <button
                   type="button"
                   class="btn btn-primary mt-2 mb-4"
@@ -395,6 +421,7 @@
                   Create bar chart - student
                 </button>
 
+                <!-- Button to clear bar chart -->
                 <button
                   type="button"
                   class="btn btn-danger mt-2 mb-4 ml-4 none"
@@ -406,6 +433,7 @@
                 </button>
               </form>
 
+              <!-- Canvas for the bar chart to go on -->
               <div
                 class="chart mt-3"
                 style="justify-content: center; width: 100%"
@@ -423,9 +451,11 @@
                 </div>
               </div>
 
+              <!-- Bar chart to compare students who failed a specific course per semester -->
               <h4 class="mt-3 mb-3">Bar chart to monitor one course</h4>
               <form id="retrieveForm">
                 <div class="form-row d-flex ml-0">
+                  <!-- Course code input -->
                   <div class="form-group mr-4">
                     <label for="courseInput">Course Code:</label>
                     <input
@@ -437,10 +467,11 @@
                     />
                   </div>
 
+                  <!-- Course component input -->
                   <div class="form-group mr-4">
-                    <label for="courseComponentInput"
-                      >Course component(s):</label
-                    >
+                    <label for="courseComponentInput">
+                      Course component(s):
+                    </label>
                     <select
                       id="courseComponentInput"
                       class="form-control"
@@ -453,6 +484,7 @@
                     </select>
                   </div>
 
+                  <!-- Chopose between number of students or percentage of students against all students -->
                   <div class="form-group mr-4">
                     <label for="valueCourseInput">Value:</label>
                     <select
@@ -469,6 +501,7 @@
                     </select>
                   </div>
 
+                  <!-- Attendance threshold input -->
                   <div class="form-group mr-4">
                     <label for="thresholdCourseInput"
                       >Minimum attendance (%):</label
@@ -484,6 +517,7 @@
                     />
                   </div>
 
+                  <!-- Choose between the currently finished sessions, all of the semester's sessions, or automatically use the max absence from the data -->
                   <div class="form-group mr-4">
                     <label for="divisorCourseInput"
                       >Attendance calculated based on:</label
@@ -499,9 +533,11 @@
                       <option value="Projected">
                         All semester sessions with projected attendance
                       </option>
+                      <option value="Max">Total absence vs Max absence</option>
                     </select>
                   </div>
 
+                  <!-- Number of semesters input -->
                   <div class="form-group mr-4">
                     <label for="semesterAmountInput"
                       >Number of semesters to compare:</label
@@ -516,6 +552,7 @@
                   </div>
                 </div>
 
+                <!-- Button to calculate and create bar chart -->
                 <button
                   type="button"
                   class="btn btn-primary mt-2 mb-4"
@@ -524,6 +561,7 @@
                   Create bar chart - course
                 </button>
 
+                <!-- Button to clear bar chart -->
                 <button
                   type="button"
                   class="btn btn-danger mt-2 mb-4 ml-4 none"
@@ -535,6 +573,7 @@
                 </button>
               </form>
 
+              <!-- Canvas for the bar chart to go on -->
               <div
                 class="chart mt-3"
                 style="justify-content: center; width: 100%"
@@ -552,9 +591,11 @@
                 </div>
               </div>
 
+              <!-- Bar chart to compare attendance on one specific course, for one studnent, per semester -->
               <h4 class="mt-3 mb-3">Bar chart for 1 student, 1 course</h4>
               <form id="retrieveForm">
                 <div class="form-row d-flex ml-0">
+                  <!-- NIM input -->
                   <div class="form-group mr-4">
                     <label for="nimStudentCourseInput">NIM:</label>
                     <input
@@ -566,6 +607,7 @@
                     />
                   </div>
 
+                  <!-- Course code input -->
                   <div class="form-group mr-4">
                     <label for="courseStudentCourseInput">Course Code:</label>
                     <input
@@ -577,6 +619,7 @@
                     />
                   </div>
 
+                  <!-- Course component input -->
                   <div class="ml-2 mr-4">
                     <label for="studentCourseComponentInput"
                       >Course Component:</label
@@ -593,6 +636,7 @@
                     </select>
                   </div>
 
+                  <!-- Choose between the number of sessions where the student is present or percentage of present sessions against all sessions -->
                   <div class="form-group mr-4">
                     <label for="valueStudentCourseInput">Value:</label>
                     <select
@@ -609,6 +653,7 @@
                     </select>
                   </div>
 
+                  <!-- Number of semesters input -->
                   <div class="form-group mr-4">
                     <label for="semesterAmountStudentCourseInput"
                       >Number of semesters to compare:</label
@@ -623,6 +668,7 @@
                   </div>
                 </div>
 
+                <!-- Button to calculate and create bar chart -->
                 <button
                   type="button"
                   class="btn btn-primary mt-2 mb-4"
@@ -631,6 +677,7 @@
                   Create bar chart - student & course
                 </button>
 
+                <!-- Button to clear bar chart -->
                 <button
                   type="button"
                   class="btn btn-danger mt-2 mb-4 ml-4 none"
@@ -642,6 +689,7 @@
                 </button>
               </form>
 
+              <!-- Canvas for the bar chart to go on -->
               <div
                 class="chart mt-3"
                 style="justify-content: center; width: 100%"
@@ -665,21 +713,44 @@
     </div>
 
     <script>
+      // variables to hold the charts, used to determine if one exists
       var attendancePieChart = null;
       var barChartMajor = null;
       var barChartStudent = null;
       var barChartCourse = null;
       var barChartStudentCourse = null;
 
+      // Run when page if loaded
       $(document).ready(function () {
+        // Change the multi-select components to the imported select2
         $('#majorInputMultiple').select2();
         $('#courseComponentInput').select2();
+
+        // Set the default of all attendance thresholds to 50
         $('#thresholdPieInput').val(50);
         $('#thresholdMajorInput').val(50);
         $('#thresholdStudentInput').val(50);
         $('#thresholdCourseInput').val(50);
+
+        // Disable atendance thresholds if the "Total absence vs Max absence" value option is chosen
+        $('#divisorStudentInput').on('change', function () {
+          if ($(this).val() === 'Max') {
+            $('#thresholdStudentInput').prop('disabled', true).val(50);
+          } else {
+            $('#thresholdStudentInput').prop('disabled', false);
+          }
+        });
+
+        $('#divisorCourseInput').on('change', function () {
+          if ($(this).val() === 'Max') {
+            $('#thresholdCourseInput').prop('disabled', true).val(50);
+          } else {
+            $('#thresholdCourseInput').prop('disabled', false);
+          }
+        });
       });
 
+      // Button for the multi-select major input for the first bar chart to select all majors at once
       $('#selectAllMajors').click(function () {
         let allOptions = $('#majorInputMultiple option')
           .map(function () {
@@ -696,9 +767,11 @@
         }
       });
 
+      // Function to clear a specific chart based on its id
       function clearChart(event) {
         let chartId = event.target.getAttribute('chartId');
 
+        // Note: The class changes allows the canvas to be invisible if there is no chart, and expand when there is
         if (chartId === 'attendancePieChart') {
           attendancePieChart.destroy();
           $('#pieChartContainer').removeClass('flex');
@@ -724,7 +797,9 @@
         }
       }
 
+      // Function to create pie chart
       function loadPieChart() {
+        // Get arguments
         var semesterType = $('#semesterType').val();
         var year = $('#yearInput').val();
         var value = $('#valueMajorInput').val();
@@ -732,6 +807,7 @@
         var threshold = $('#thresholdPieInput').val();
         var divisor = $('#divisorPieInput').val();
 
+        // Checking that a year exists and is an positive integer
         if (!year) {
           alert('Please enter a year.');
           return;
@@ -747,6 +823,7 @@
           return;
         }
 
+        // Checking if threshold is between 0 and 100
         if ((Number(threshold) < 0) | (Number(threshold) > 100)) {
           alert('Attendance threshold must be between 0% and 100%');
           return;
@@ -818,7 +895,9 @@
         });
       }
 
+      // Function to calculate the first bar chart (major)
       function loadBarChartMajorComparison() {
+        // Get arguments
         var semesterType = $('#semesterTypeMajor').val();
         var year = $('#yearInputMajor').val();
         var value = $('#valueInput').val();
@@ -826,6 +905,7 @@
         var threshold = $('#thresholdMajorInput').val();
         var divisor = $('#divisorMajorInput').val();
 
+        // Checking that a year exists and is a positive integer
         if (!year) {
           alert('Please enter a year.');
           return;
@@ -841,11 +921,13 @@
           return;
         }
 
+        // Checking that at least one major is chosen
         if (majors.length === 0) {
           alert('Please select at least one major');
           return;
         }
 
+        // Checking that the attendance threshold is between 0 and 100
         if ((Number(threshold) < 0) | (Number(threshold) > 100)) {
           alert('Attendance threshold must be between 0% and 100%');
           return;
@@ -916,11 +998,14 @@
         });
       }
 
+      // Function to calculate the second bar chart (student)
       function loadBarChartStudent() {
+        // Get arguments
         var nim = $('#nimInput').val();
         var threshold = $('#thresholdStudentInput').val();
         var divisor = $('#divisorStudentInput').val();
 
+        // Checking that a NIM exists and that it is a number
         if (!nim) {
           alert('Please enter NIM.');
           return;
@@ -931,6 +1016,7 @@
           return;
         }
 
+        // Checking that the attendance threshold is between 0 and 100
         if ((Number(threshold) < 0) | (Number(threshold) > 100)) {
           alert('Attendance threshold must be between 0% and 100%');
           return;
@@ -974,7 +1060,10 @@
                 labels: labels,
                 datasets: [
                   {
-                    label: `${nim} - ${data.name} number of courses <${threshold}% attendance`,
+                    label:
+                      divisor === 'Max'
+                        ? `${nim} - ${data.name} number of courses where Total absence > Max absence`
+                        : `${nim} - ${data.name} number of courses <${threshold}% attendance`,
                     data: values,
                     borderWidth: 0, // Removing default white border so it looks fine if the whole chart is one label
                   },
@@ -1016,7 +1105,9 @@
         });
       }
 
+      // Function to calculate the third bar chart (course)
       function loadBarChartCourse() {
+        // Get arguments
         var course = $('#courseInput').val();
         var value = $('#valueCourseInput').val();
         var components = $('#courseComponentInput').val();
@@ -1024,16 +1115,19 @@
         var threshold = $('#thresholdCourseInput').val();
         var divisor = $('#divisorCourseInput').val();
 
+        // Check that a course code exists
         if (!course) {
           alert('Please enter Course Code.');
           return;
         }
 
+        // Check that at least 1 component is chosen
         if (components.length <= 0) {
           alert('Choose at least 1 component');
           return;
         }
 
+        // Check that a semester count exists and that it is a positive integer
         if (!semesterCount) {
           alert('Please enter the number of semesters');
           return;
@@ -1049,6 +1143,7 @@
           return;
         }
 
+        // Check that the attendance threshold is between 0 and 100
         if ((Number(threshold) < 0) | (Number(threshold) > 100)) {
           alert('Attendance threshold must be between 0% and 100%');
           return;
@@ -1103,11 +1198,12 @@
                   : componentEntry.count;
               });
 
-              console.log(`Dataset for ${compName}:`, dataValues);
-
               datasets.push({
-                label: `${course} - ${data.name} - ${compName} ${value} of students with <50% attendance`,
-                data: dataValues, // Setting to null so chart.js doesn't ignore it
+                label:
+                  divisor === 'Max'
+                    ? `${course} - ${data.name} - ${compName} ${value} of students with Total absence > Max absence`
+                    : `${course} - ${data.name} - ${compName} ${value} of students with <${threshold}% attendance`,
+                data: dataValues,
                 borderWidth: 0,
               });
             });
@@ -1149,13 +1245,16 @@
         });
       }
 
+      // Function to calculate the fourth bar chart (student and course)
       function loadBarChartStudentCourse() {
+        // Get arguments
         var nim = $('#nimStudentCourseInput').val();
         var course = $('#courseStudentCourseInput').val();
         var component = $('#studentCourseComponentInput').val();
         var value = $('#valueStudentCourseInput').val();
         var semesters = $('#semesterAmountStudentCourseInput').val();
 
+        // Check that a NIM exists and is a number
         if (!nim) {
           alert('Please enter NIM.');
           return;
@@ -1166,6 +1265,7 @@
           return;
         }
 
+        // Check that the semester count exists and is a positive integer
         if (!semesters) {
           alert('Please enter the number of semesters');
           return;
@@ -1181,6 +1281,7 @@
           return;
         }
 
+        // Check that a course code exists
         if (!course) {
           alert('Please enter Course Code.');
           return;
